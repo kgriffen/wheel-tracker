@@ -432,6 +432,10 @@ const SWATCH_COLORS = ['#7F77DD','#1D9E75','#EF9F27','#D85A30','#185FA5','#E87B3
 // ═══════════════════════════════════════════════════════════
 const DEFAULT_BUCKETS = [
   {
+    id:'b-urgent', name:'Urgent', color:'#D85A30',
+    conditions:[{field:'pop',op:'<',value:'50'}]
+  },
+  {
     id:'b-take-profits', name:'Take Profits', color:'#7F77DD',
     conditions:[{field:'pl_pct',op:'>=',value:'50'}]
   },
@@ -440,16 +444,12 @@ const DEFAULT_BUCKETS = [
     conditions:[{field:'early_profit',op:'=',value:'true'}]
   },
   {
-    id:'b-working', name:'Working', color:'#185FA5',
-    conditions:[{field:'itm_otm',op:'=',value:'OTM'},{field:'pop',op:'>=',value:'65'}]
-  },
-  {
     id:'b-warning', name:'Warning', color:'#EF9F27',
     conditions:[{field:'pop',op:'<',value:'65'}]
   },
   {
-    id:'b-urgent', name:'Urgent', color:'#D85A30',
-    conditions:[{field:'pop',op:'<',value:'35'}]
+    id:'b-working', name:'Working', color:'#185FA5',
+    conditions:[{field:'itm_otm',op:'=',value:'OTM'},{field:'pop',op:'>=',value:'65'}]
   }
 ];
 
@@ -531,6 +531,7 @@ async function loadFromGH(){
     posImportDate=p.posImportDate||'';
     localStorage.setItem('wt_data',JSON.stringify({positions,buckets,colWidths,posImportDate}));
     showSync('ok','Synced ✓');
+    migrateBucketOrder();
     renderAll();
   }catch(e){loadLocal();showSync('err','GitHub error — using local');}
 }
@@ -544,6 +545,7 @@ function loadLocal(){
     colHidden=d.colHidden||{};
     posImportDate=d.posImportDate||'';
   }catch(e){positions=[];buckets=DEFAULT_BUCKETS;colWidths={};}
+  migrateBucketOrder();
   renderAll();
 }
 
@@ -1503,6 +1505,27 @@ function showPage(id,btn){
 function openM(id){document.getElementById(id).classList.add('open');}
 function closeM(id){document.getElementById(id).classList.remove('open');}
 document.querySelectorAll('.mo').forEach(m=>m.addEventListener('click',e=>{if(e.target===m)m.classList.remove('open');}));
+
+
+// Migrate existing saved buckets to new default order if they're the default set
+function migrateBucketOrder(){
+  const defaultIds = ['b-urgent','b-take-profits','b-early-close','b-warning','b-working'];
+  const savedIds = buckets.map(b=>b.id);
+  const isDefaultSet = defaultIds.every(id=>savedIds.includes(id)) && savedIds.every(id=>defaultIds.includes(id));
+  if(!isDefaultSet) return; // user has custom buckets — don't touch
+  // Fix Urgent threshold if still at old value (35 → 50)
+  const urgent = buckets.find(b=>b.id==='b-urgent');
+  if(urgent){
+    urgent.conditions = urgent.conditions.map(c=>
+      c.field==='pop' && c.op==='<' && c.value==='35' ? {...c, value:'50'} : c
+    );
+  }
+  const alreadyOrdered = JSON.stringify(savedIds) === JSON.stringify(defaultIds);
+  if(alreadyOrdered && urgent?.conditions[0]?.value==='50') return;
+  // Reorder to match new default order
+  buckets = defaultIds.map(id=>buckets.find(b=>b.id===id)).filter(Boolean);
+  saveToGH();
+}
 
 function renderAll(){renderPositions();renderWorkflow();}
 
