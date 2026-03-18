@@ -1,0 +1,1379 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wheel Tracker</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:#F7F6F2;--surface:#FFFFFF;--surface2:#F0EFE9;--surface3:#E8E7E0;
+  --border:rgba(0,0,0,0.07);--border2:rgba(0,0,0,0.13);
+  --text:#1A1917;--text2:#6B6A65;--text3:#9E9D98;
+  --green:#1D9E75;--green-bg:#EAF5EF;--green-t:#0F6E56;
+  --red:#D85A30;--red-bg:#FDF0EB;--red-t:#993C1D;
+  --amber:#BA7517;--amber-bg:#FDF5E6;--amber-t:#854F0B;
+  --blue:#185FA5;--blue-bg:#EAF1FB;--blue-t:#0C447C;
+  --purple:#534AB7;--purple-bg:#EEEDFE;--purple-t:#3C3489;
+  --r:8px;--rl:12px;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{font-size:14px}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;-webkit-font-smoothing:antialiased}
+.topbar{background:var(--surface);border-bottom:1px solid var(--border);height:52px;display:flex;align-items:center;padding:0 20px;gap:0;position:sticky;top:0;z-index:50}
+.logo{font-size:13px;font-weight:500;display:flex;align-items:center;gap:8px;margin-right:28px;white-space:nowrap;letter-spacing:-.01em}
+.logo-icon{width:24px;height:24px;background:var(--text);border-radius:6px;display:flex;align-items:center;justify-content:center}
+.logo-icon svg{width:13px;height:13px;stroke:#fff;stroke-width:2;fill:none}
+nav{display:flex;gap:2px;flex:1}
+.nbtn{padding:6px 13px;font-size:13px;font-family:inherit;color:var(--text2);background:none;border:none;border-radius:var(--r);cursor:pointer;transition:all .12s}
+.nbtn:hover{background:var(--surface2);color:var(--text)}
+.nbtn.active{background:var(--surface2);color:var(--text);font-weight:500}
+.tr{display:flex;align-items:center;gap:8px}
+.btn{padding:6px 13px;font-size:13px;font-family:inherit;border:1px solid var(--border2);border-radius:var(--r);cursor:pointer;background:var(--surface);color:var(--text);transition:all .12s;white-space:nowrap}
+.btn:hover{background:var(--surface2)}
+.btn:active{transform:scale(.98)}
+.btn-p{background:var(--text);color:#fff;border-color:var(--text)}
+.btn-p:hover{opacity:.85;background:var(--text)}
+.btn-sm{padding:4px 10px;font-size:12px}
+.btn-conn{border-color:var(--green);color:var(--green-t);background:var(--green-bg)}
+.page{display:none;padding:24px 20px;max-width:1500px;margin:0 auto}
+.page.active{display:block}
+.ph{margin-bottom:18px}
+.pt{font-size:19px;font-weight:500;letter-spacing:-.02em;margin-bottom:2px}
+.ps{font-size:13px;color:var(--text2)}
+.sg{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:18px}
+.stat{background:var(--surface);border:1px solid var(--border);border-radius:var(--rl);padding:13px 15px}
+.sl{font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px}
+.sv{font-size:21px;font-weight:500;letter-spacing:-.03em;line-height:1}
+.ss{font-size:11px;color:var(--text3);margin-top:3px}
+.cg{color:var(--green)}.cr{color:var(--red)}.ca{color:var(--amber)}.cb{color:var(--blue)}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--rl);overflow:hidden;margin-bottom:12px}
+.toolbar{padding:11px 14px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;border-bottom:1px solid var(--border)}
+.si{padding:6px 11px;font-size:13px;font-family:inherit;border:1px solid var(--border2);border-radius:var(--r);background:var(--surface2);color:var(--text);outline:none;transition:border-color .12s}
+.si:focus{border-color:var(--text);background:var(--surface)}
+.si-grow{flex:1;min-width:130px}
+.tabs{display:flex;gap:2px;background:var(--surface2);border-radius:var(--r);padding:3px;width:fit-content}
+.tab{padding:5px 13px;font-size:13px;font-family:inherit;border:none;background:none;border-radius:6px;cursor:pointer;color:var(--text2);transition:all .12s}
+.tab.active{background:var(--surface);color:var(--text);font-weight:500;box-shadow:0 1px 3px rgba(0,0,0,.07)}
+.tw{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:12.5px}
+th{text-align:left;font-size:10.5px;font-weight:500;color:var(--text3);padding:7px 11px;border-bottom:1px solid var(--border);white-space:nowrap;cursor:pointer;user-select:none;text-transform:uppercase;letter-spacing:.3px}
+th:hover{color:var(--text2)}
+td{padding:8px 11px;border-bottom:1px solid var(--border);white-space:nowrap}
+tr:last-child td{border-bottom:none}
+tbody tr:hover td{background:var(--surface2)}
+.mono{font-family:'DM Mono',monospace;font-size:12px}
+.badge{display:inline-flex;align-items:center;padding:2px 7px;border-radius:20px;font-size:11px;font-weight:500;white-space:nowrap}
+.bg{background:var(--green-bg);color:var(--green-t)}
+.br{background:var(--red-bg);color:var(--red-t)}
+.ba{background:var(--amber-bg);color:var(--amber-t)}
+.bb{background:var(--blue-bg);color:var(--blue-t)}
+.bgy{background:var(--surface2);color:var(--text2);border:1px solid var(--border)}
+.bp{background:var(--purple-bg);color:var(--purple-t)}
+/* SPREAD GROUP */
+.spread-group td{background:#FAFAF8}
+.spread-group-hdr td{background:var(--surface2);font-size:11px;color:var(--text3);padding:4px 11px;border-bottom:1px solid var(--border)}
+.spread-label{font-size:10px;background:var(--purple-bg);color:var(--purple-t);padding:1px 6px;border-radius:10px;margin-left:6px;font-weight:500}
+/* BUCKET */
+.bucket{background:var(--surface);border:1px solid var(--border);border-radius:var(--rl);margin-bottom:10px;overflow:hidden}
+.bhdr{padding:12px 15px;display:flex;align-items:center;gap:10px;cursor:pointer;transition:background .1s;user-select:none}
+.bhdr:hover{background:var(--surface2)}
+.bdot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.bname{font-size:13px;font-weight:500;flex:1}
+.bcnt{font-size:12px;color:var(--text2);background:var(--surface2);padding:2px 9px;border-radius:20px;border:1px solid var(--border)}
+.bmeta{display:flex;gap:18px;padding:9px 15px;background:var(--surface2);border-bottom:1px solid var(--border);font-size:12px;flex-wrap:wrap}
+.bmi{display:flex;flex-direction:column;gap:1px}
+.bml{font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.4px}
+.bmv{font-weight:500}
+.bbody{display:none}
+.bbody.open{display:block}
+/* WHEELS */
+.wcard{background:var(--surface);border:1px solid var(--border);border-radius:var(--rl);margin-bottom:12px;overflow:hidden}
+.wtop{padding:13px 17px;display:flex;justify-content:space-between;align-items:flex-start;border-bottom:1px solid var(--border)}
+.wticker{font-size:15px;font-weight:500;letter-spacing:-.02em}
+.wmeta{font-size:11px;color:var(--text3);margin-top:2px}
+.wpnl{text-align:right}
+.wpnll{font-size:11px;color:var(--text3);margin-bottom:2px}
+.wpnlv{font-size:14px;font-weight:500;letter-spacing:-.02em}
+.wchain{padding:15px 17px;overflow-x:auto}
+.wchain-inner{display:flex;align-items:center;gap:6px;min-width:max-content}
+.leg{border:1.5px solid var(--border2);border-radius:10px;padding:10px 13px;min-width:145px;background:var(--surface2)}
+.leg.open{border-color:var(--blue);background:var(--blue-bg)}
+.leg.rolled{border-color:var(--amber);background:var(--amber-bg);opacity:.82}
+.leg.closed{border-color:var(--border);opacity:.65}
+.leg.spread-leg{border-style:dashed}
+.ltype{font-size:10.5px;color:var(--text2);margin-bottom:4px;display:flex;align-items:center;gap:3px}
+.lstrike{font-size:13px;font-weight:500;font-family:'DM Mono',monospace}
+.lexp{font-size:10.5px;color:var(--text3);margin-top:1px}
+.lprem{font-size:12px;font-weight:500;margin-top:4px}
+.lprem.pos{color:var(--green)}.lprem.neg{color:var(--red)}
+.carr{color:var(--text3);font-size:14px;flex-shrink:0}
+.wfoot{padding:9px 17px;border-top:1px solid var(--border);display:flex;justify-content:space-between;font-size:12px;color:var(--text2);background:var(--surface2)}
+/* EMPTY */
+.empty{text-align:center;padding:52px 20px;color:var(--text3)}
+.et{font-size:14px;font-weight:500;color:var(--text2);margin-bottom:6px}
+/* MODAL */
+.mo{display:none;position:fixed;inset:0;background:rgba(0,0,0,.32);z-index:200;align-items:center;justify-content:center;padding:16px}
+.mo.open{display:flex}
+.modal{background:var(--surface);border-radius:var(--rl);padding:22px;width:min(520px,100%);border:1px solid var(--border2);max-height:92vh;overflow-y:auto}
+.mtitle{font-size:15px;font-weight:500;letter-spacing:-.02em;margin-bottom:16px}
+.fr{margin-bottom:12px}
+.fr label{display:block;font-size:12px;color:var(--text2);margin-bottom:3px}
+.fr input,.fr select{width:100%;padding:7px 10px;font-size:13px;font-family:inherit;border:1px solid var(--border2);border-radius:var(--r);background:var(--surface2);color:var(--text);outline:none;transition:border-color .12s}
+.fr input:focus,.fr select:focus{border-color:var(--text);background:var(--surface)}
+.f2{display:grid;grid-template-columns:1fr 1fr;gap:11px}
+.mf{display:flex;justify-content:flex-end;gap:8px;margin-top:18px}
+.notice{font-size:12px;line-height:1.55;border-radius:var(--r);padding:9px 12px;margin-bottom:13px}
+.ni{color:var(--blue-t);background:var(--blue-bg);border:1px solid rgba(24,95,165,.18)}
+.nw{color:var(--amber-t);background:var(--amber-bg);border:1px solid rgba(186,117,23,.18)}
+.ns{color:var(--green-t);background:var(--green-bg);border:1px solid rgba(29,158,117,.18)}
+.ne{color:var(--red-t);background:var(--red-bg);border:1px solid rgba(216,90,48,.18)}
+.ua{border:1.5px dashed var(--border2);border-radius:var(--rl);padding:26px;text-align:center;cursor:pointer;background:var(--surface2);transition:all .12s}
+.ua:hover{border-color:var(--text);background:var(--bg)}
+.ua input{display:none}
+/* IMPORT LOG */
+.ilog{max-height:200px;overflow-y:auto;background:var(--surface2);border-radius:var(--r);padding:10px 12px;font-size:12px;font-family:'DM Mono',monospace;line-height:1.7;margin-top:12px}
+.ilog .ok{color:var(--green-t)}.ilog .sk{color:var(--text3)}.ilog .er{color:var(--red-t)}.ilog .inf{color:var(--blue-t)}
+/* SYNC */
+.syncbar{position:fixed;bottom:16px;right:16px;background:var(--surface);border:1px solid var(--border2);border-radius:var(--rl);padding:9px 15px;font-size:12px;display:none;align-items:center;gap:8px;box-shadow:0 4px 16px rgba(0,0,0,.07);z-index:100}
+.syncbar.show{display:flex}
+.sdot{width:7px;height:7px;border-radius:50%;background:var(--green)}
+.sdot.syncing{background:var(--amber);animation:pulse 1s infinite}
+.sdot.err{background:var(--red)}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+/* SETTINGS */
+.ss-section{background:var(--surface);border:1px solid var(--border);border-radius:var(--rl);padding:18px;margin-bottom:14px}
+.ss-title{font-size:14px;font-weight:500;margin-bottom:3px}
+.ss-sub{font-size:12px;color:var(--text3);margin-bottom:14px}
+.irow{display:flex;gap:8px}
+.irow input{flex:1}
+/* FUTURES badge */
+.fut-badge{font-size:9px;background:var(--purple-bg);color:var(--purple-t);padding:1px 5px;border-radius:8px;margin-left:4px;vertical-align:middle;font-weight:500}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="logo">
+    <div class="logo-icon"><svg viewBox="0 0 13 13"><polyline points="1,10 4,6 7,8 12,2"/></svg></div>
+    Wheel Tracker
+  </div>
+  <nav>
+    <button class="nbtn active" onclick="showPage('trades',this)">Trades</button>
+    <button class="nbtn" onclick="showPage('workflow',this)">Workflow</button>
+    <button class="nbtn" onclick="showPage('wheels',this)">Wheels</button>
+    <button class="nbtn" onclick="showPage('settings',this)">Settings</button>
+  </nav>
+  <div class="tr">
+    <span id="sync-lbl" style="font-size:11px;color:var(--text3)"></span>
+    <span id="last-import-lbl" style="font-size:11px;color:var(--text3)"></span>
+    <button class="btn btn-sm" id="tt-btn" onclick="openM('conn-mo')">Connect Tastytrade</button>
+    <button class="btn btn-sm" onclick="openM('daily-mo')">Daily Import</button>
+    <button class="btn btn-sm btn-p" onclick="openM('add-mo')">+ Add trade</button>
+  </div>
+</div>
+
+<!-- ═══ TRADES ═══ -->
+<div class="page active" id="page-trades">
+  <div class="ph"><div class="pt">Trades</div><div class="ps">All open and closed positions</div></div>
+  <div class="sg" id="t-stats"></div>
+  <div class="card">
+    <div class="toolbar">
+      <div class="tabs">
+        <button class="tab active" onclick="setTTab('open',this)">Open</button>
+        <button class="tab" onclick="setTTab('closed',this)">Closed</button>
+        <button class="tab" onclick="setTTab('all',this)">All</button>
+      </div>
+      <input class="si si-grow" id="t-search" placeholder="Search symbol…" oninput="renderTrades()">
+      <select class="si" id="t-type" onchange="renderTrades()">
+        <option value="">All types</option><option>Put</option><option>Call</option>
+      </select>
+      <select class="si" id="t-inst" onchange="renderTrades()">
+        <option value="">All instruments</option>
+        <option value="equity">Equity options</option>
+        <option value="futures">Futures options</option>
+      </select>
+    </div>
+    <div class="tw">
+      <table>
+        <thead><tr>
+          <th onclick="sortBy('symbol')">Symbol</th>
+          <th onclick="sortBy('instType')">Type</th>
+          <th onclick="sortBy('callPut')">C/P</th>
+          <th onclick="sortBy('strike')">Strike</th>
+          <th onclick="sortBy('qty')">Qty</th>
+          <th onclick="sortBy('expDate')">Exp</th>
+          <th onclick="sortBy('dte')">DTE</th>
+          <th onclick="sortBy('netPremium')">Net premium</th>
+          <th onclick="sortBy('mark')">Mark</th>
+          <th onclick="sortBy('premCaptured')">% Captured</th>
+          <th onclick="sortBy('annYield')">Ann. yield</th>
+          <th onclick="sortBy('pop')">PoP</th>
+          <th onclick="sortBy('lastClose')">Underlying</th>
+          <th onclick="sortBy('itmOtm')">ITM/OTM</th>
+          <th onclick="sortBy('plOpen')">P/L Open</th>
+          <th onclick="sortBy('status')">Status</th>
+          <th></th>
+        </tr></thead>
+        <tbody id="t-body"></tbody>
+      </table>
+    </div>
+    <div id="t-empty" class="empty" style="display:none">
+      <div style="font-size:28px;margin-bottom:10px">📋</div>
+      <div class="et">No trades yet</div>
+      <div>Use Daily Import to load your positions and transactions from Tastytrade.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ WORKFLOW ═══ -->
+<div class="page" id="page-workflow">
+  <div class="ph"><div class="pt">Workflow</div><div class="ps">Open trades organized by action priority — updated from your Positions file</div></div>
+  <div class="sg" id="wf-stats"></div>
+  <div id="wf-buckets"></div>
+  <div id="wf-empty" class="empty" style="display:none">
+    <div style="font-size:28px;margin-bottom:10px">⚡</div>
+    <div class="et">No open trades</div><div>Import your positions to populate workflow.</div>
+  </div>
+</div>
+
+<!-- ═══ WHEELS ═══ -->
+<div class="page" id="page-wheels">
+  <div class="ph"><div class="pt">Options Wheels</div><div class="ps">Complete wheel cycles grouped by underlying</div></div>
+  <div class="tabs" style="margin-bottom:16px">
+    <button class="tab active" onclick="setWTab('open',this)">Open</button>
+    <button class="tab" onclick="setWTab('closed',this)">Closed</button>
+    <button class="tab" onclick="setWTab('all',this)">All</button>
+  </div>
+  <div id="w-list"></div>
+  <div id="w-empty" class="empty" style="display:none">
+    <div style="font-size:28px;margin-bottom:10px">🔄</div>
+    <div class="et">No wheels yet</div><div>Wheels are automatically grouped from your trades by underlying symbol.</div>
+  </div>
+</div>
+
+<!-- ═══ SETTINGS ═══ -->
+<div class="page" id="page-settings">
+  <div class="ph"><div class="pt">Settings</div><div class="ps">GitHub storage and import configuration</div></div>
+  <div class="ss-section">
+    <div class="ss-title">GitHub storage</div>
+    <div class="ss-sub">Trades saved to your repo so data persists and syncs across devices.</div>
+    <div class="fr"><label>GitHub username</label><input id="s-user" value="kgriffen"></div>
+    <div class="fr"><label>Repository name</label><input id="s-repo" value="wheel-tracker"></div>
+    <div class="fr"><label>Personal access token</label>
+      <div class="irow"><input id="s-token" type="password" placeholder="ghp_xxxxxxxxxxxx"><button class="btn" onclick="testGH()">Test</button></div>
+    </div>
+    <div id="gh-test" style="font-size:12px;margin-top:6px"></div>
+    <div style="display:flex;gap:8px;margin-top:13px">
+      <button class="btn btn-p" onclick="saveSettings()">Save settings</button>
+      <button class="btn" onclick="loadFromGH()">Sync now</button>
+    </div>
+  </div>
+  <div class="ss-section">
+    <div class="ss-title">Import history</div>
+    <div class="ss-sub">Track which files have been imported to prevent duplicates.</div>
+    <div id="import-history" style="font-size:12px;color:var(--text3)">No imports yet.</div>
+    <div style="margin-top:12px;display:flex;gap:8px">
+      <button class="btn" onclick="exportJSON()">Export JSON</button>
+      <button class="btn" onclick="exportCSV()">Export CSV</button>
+      <button class="btn" style="color:var(--red-t);border-color:var(--red)" onclick="clearAll()">Clear all data</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ DAILY IMPORT MODAL ═══ -->
+<div class="mo" id="daily-mo">
+  <div class="modal" style="width:min(580px,100%)">
+    <div class="mtitle">Daily Import</div>
+    <div class="notice ni">Import your <strong>Positions file</strong> first (updates marks, PoP, Greeks), then your <strong>Transactions file</strong> (opens/closes/rolls trades). Both exports from Tastytrade → Account → History / Positions.</div>
+
+    <div style="display:flex;gap:10px;margin-bottom:16px">
+      <div style="flex:1">
+        <div style="font-size:12px;font-weight:500;margin-bottom:6px">Step 1 — Positions CSV</div>
+        <div class="ua" onclick="document.getElementById('pos-file').click()">
+          <input type="file" id="pos-file" accept=".csv" onchange="handlePositions(event)">
+          <div style="font-size:20px;margin-bottom:6px">📊</div>
+          <div style="font-size:12px;color:var(--text2)">Positions export</div>
+          <div style="font-size:11px;color:var(--text3)">tastytrade_positions_*.csv</div>
+        </div>
+      </div>
+      <div style="flex:1">
+        <div style="font-size:12px;font-weight:500;margin-bottom:6px">Step 2 — Transactions CSV</div>
+        <div class="ua" onclick="document.getElementById('txn-file').click()">
+          <input type="file" id="txn-file" accept=".csv" onchange="handleTransactions(event)">
+          <div style="font-size:20px;margin-bottom:6px">📋</div>
+          <div style="font-size:12px;color:var(--text2)">Transactions export</div>
+          <div style="font-size:11px;color:var(--text3)">tastytrade_transactions_*.csv</div>
+        </div>
+      </div>
+    </div>
+
+    <div id="import-log" class="ilog" style="display:none"></div>
+    <div class="mf"><button class="btn" onclick="closeM('daily-mo')">Close</button></div>
+  </div>
+</div>
+
+<!-- ═══ ADD TRADE MODAL ═══ -->
+<div class="mo" id="add-mo">
+  <div class="modal">
+    <div class="mtitle">Add trade manually</div>
+    <div class="f2">
+      <div class="fr"><label>Underlying symbol</label><input id="f-sym" placeholder="AAPL" style="text-transform:uppercase"></div>
+      <div class="fr"><label>Instrument type</label><select id="f-inst"><option value="equity">Equity Option</option><option value="futures">Futures Option</option></select></div>
+    </div>
+    <div class="f2">
+      <div class="fr"><label>Call / Put</label><select id="f-cp"><option>Put</option><option>Call</option></select></div>
+      <div class="fr"><label>Action</label><select id="f-action"><option value="STO">Sell to Open (short)</option><option value="BTO">Buy to Open (long)</option></select></div>
+    </div>
+    <div class="f2">
+      <div class="fr"><label>Strike</label><input id="f-strike" type="number" step="0.5"></div>
+      <div class="fr"><label>Contracts</label><input id="f-qty" type="number" value="1" min="1"></div>
+    </div>
+    <div class="f2">
+      <div class="fr"><label>Expiration</label><input id="f-exp" type="date"></div>
+      <div class="fr"><label>Open date</label><input id="f-odate" type="date"></div>
+    </div>
+    <div class="f2">
+      <div class="fr"><label>Net premium ($)</label><input id="f-prem" type="number" step="0.01"></div>
+      <div class="fr"><label>Capital / collateral ($)</label><input id="f-cap" type="number"></div>
+    </div>
+    <div class="f2">
+      <div class="fr"><label>Underlying last price</label><input id="f-last" type="number" step="0.01"></div>
+      <div class="fr"><label>PoP %</label><input id="f-pop" type="number" step="1" placeholder="e.g. 72"></div>
+    </div>
+    <div class="fr"><label>Notes</label><input id="f-notes" placeholder="Optional"></div>
+    <div class="mf">
+      <button class="btn" onclick="closeM('add-mo')">Cancel</button>
+      <button class="btn btn-p" onclick="saveManualTrade()">Save trade</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ TASTYTRADE MODAL ═══ -->
+<div class="mo" id="conn-mo">
+  <div class="modal">
+    <div class="mtitle">Connect Tastytrade API</div>
+    <div class="notice ni">Credentials sent only to Tastytrade servers to get a session token. Nothing stored externally.</div>
+    <div id="cors-warn" class="notice nw" style="display:none">Tastytrade may block browser API calls (CORS). If this fails, use CSV import via Daily Import instead.</div>
+    <div class="fr"><label>Username or email</label><input id="tt-u" type="text"></div>
+    <div class="fr"><label>Password</label><input id="tt-p" type="password"></div>
+    <button class="btn btn-p" style="width:100%" onclick="connectTT()">Sign in and fetch positions</button>
+    <div id="tt-res" style="font-size:12px;margin-top:10px;display:none"></div>
+    <div class="mf"><button class="btn" onclick="closeM('conn-mo')">Close</button></div>
+  </div>
+</div>
+
+<!-- SYNC BAR -->
+<div class="syncbar" id="syncbar">
+  <div class="sdot" id="sdot"></div>
+  <span id="smsg"></span>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════
+let trades = [];           // all trade records
+let importedOrders = {};   // { "orderId|date": true } — dedup log
+let importLog = [];        // messages shown in import panel
+let ghCfg = { user:'kgriffen', repo:'wheel-tracker', token:'' };
+let ghSha = null;
+let sortCol = 'dte', sortAsc = true;
+let tTab = 'open', wTab = 'open';
+
+// ═══════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════
+window.addEventListener('DOMContentLoaded', () => {
+  try { const s = localStorage.getItem('wt_cfg'); if(s) ghCfg = {...ghCfg,...JSON.parse(s)}; } catch(e){}
+  document.getElementById('s-user').value = ghCfg.user;
+  document.getElementById('s-repo').value = ghCfg.repo;
+  document.getElementById('s-token').value = ghCfg.token;
+  document.getElementById('f-odate').value = today();
+  loadFromGH();
+});
+
+// ═══════════════════════════════════════════════
+// GITHUB
+// ═══════════════════════════════════════════════
+const GH_FILE = 'trades.json';
+const ghUrl = () => `https://api.github.com/repos/${ghCfg.user}/${ghCfg.repo}/contents/${GH_FILE}`;
+const ghH = () => ({ 'Authorization':'token '+ghCfg.token, 'Accept':'application/vnd.github.v3+json', 'Content-Type':'application/json' });
+
+async function loadFromGH() {
+  if(!ghCfg.token) { loadLocal(); return; }
+  showSync('syncing','Loading from GitHub…');
+  try {
+    const r = await fetch(ghUrl(), { headers: ghH() });
+    if(r.status===404) { loadLocal(); showSync('ok','GitHub connected'); return; }
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    const d = await r.json();
+    ghSha = d.sha;
+    const parsed = JSON.parse(atob(d.content.replace(/\n/g,'')));
+    trades = parsed.trades || [];
+    importedOrders = parsed.importedOrders || {};
+    localStorage.setItem('wt_data', JSON.stringify({trades, importedOrders}));
+    showSync('ok','Synced ✓');
+    renderAll();
+  } catch(e) { loadLocal(); showSync('err','GitHub error — using local'); }
+}
+
+function loadLocal() {
+  try {
+    const d = JSON.parse(localStorage.getItem('wt_data')||'{}');
+    trades = d.trades || [];
+    importedOrders = d.importedOrders || {};
+  } catch(e) { trades=[]; importedOrders={}; }
+  renderAll();
+}
+
+async function saveToGH() {
+  localStorage.setItem('wt_data', JSON.stringify({trades, importedOrders}));
+  if(!ghCfg.token) return;
+  showSync('syncing','Saving…');
+  try {
+    const content = btoa(unescape(encodeURIComponent(JSON.stringify({trades, importedOrders, updated: new Date().toISOString()}, null, 2))));
+    const body = { message:'Update trades '+today(), content };
+    if(ghSha) body.sha = ghSha;
+    const r = await fetch(ghUrl(), { method:'PUT', headers:ghH(), body:JSON.stringify(body) });
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    const d = await r.json();
+    ghSha = d.content?.sha;
+    showSync('ok','Saved to GitHub ✓');
+  } catch(e) { showSync('err','Save failed — stored locally'); }
+}
+
+async function testGH() {
+  const u=document.getElementById('s-user').value.trim();
+  const rp=document.getElementById('s-repo').value.trim();
+  const tk=document.getElementById('s-token').value.trim();
+  const el=document.getElementById('gh-test');
+  el.textContent='Testing…'; el.style.color='var(--text3)';
+  try {
+    const r = await fetch(`https://api.github.com/repos/${u}/${rp}`, { headers:{'Authorization':'token '+tk,'Accept':'application/vnd.github.v3+json'} });
+    if(r.ok) { el.textContent='✓ Connected'; el.style.color='var(--green)'; }
+    else { el.textContent='✗ Failed ('+r.status+')'; el.style.color='var(--red)'; }
+  } catch(e) { el.textContent='✗ Network error'; el.style.color='var(--red)'; }
+}
+
+function saveSettings() {
+  ghCfg.user = document.getElementById('s-user').value.trim();
+  ghCfg.repo = document.getElementById('s-repo').value.trim();
+  ghCfg.token = document.getElementById('s-token').value.trim();
+  localStorage.setItem('wt_cfg', JSON.stringify(ghCfg));
+  loadFromGH();
+}
+
+function showSync(state, msg) {
+  const bar=document.getElementById('syncbar'), dot=document.getElementById('sdot');
+  dot.className='sdot'+(state==='syncing'?' syncing':state==='err'?' err':'');
+  document.getElementById('smsg').textContent=msg;
+  document.getElementById('sync-lbl').textContent=state==='ok'?'GitHub ✓':state==='err'?'Local only':'';
+  bar.classList.add('show');
+  if(state!=='syncing') setTimeout(()=>bar.classList.remove('show'),3000);
+}
+
+// ═══════════════════════════════════════════════
+// HELPERS
+// ═══════════════════════════════════════════════
+function today() { return new Date().toISOString().split('T')[0]; }
+
+function calcDTE(exp) {
+  if(!exp) return null;
+  const now=new Date(); now.setHours(0,0,0,0);
+  return Math.round((new Date(exp)-now)/86400000);
+}
+
+function calcITMOTM(cp, strike, last) {
+  const s=parseFloat(strike), l=parseFloat(last);
+  if(!s||!l||isNaN(s)||isNaN(l)) return null;
+  const pct=((s-l)/l)*100;
+  if(cp==='Put') {
+    if(s>l*1.02) return {label:'ITM',pct:pct.toFixed(1)};
+    if(s>l*0.98) return {label:'ATM',pct:pct.toFixed(1)};
+    return {label:'OTM',pct:pct.toFixed(1)};
+  } else {
+    if(s<l*0.98) return {label:'ITM',pct:(-pct).toFixed(1)};
+    if(s<l*1.02) return {label:'ATM',pct:pct.toFixed(1)};
+    return {label:'OTM',pct:pct.toFixed(1)};
+  }
+}
+
+function calcAnnYield(prem, cap, dte) {
+  const p=parseFloat(prem), c=parseFloat(cap), d=parseInt(dte);
+  if(!p||!c||!d||d<=0) return null;
+  return ((p/c)*(365/d)*100).toFixed(1);
+}
+
+function calcPremCaptured(openPrem, mark, qty, mult) {
+  const op=parseFloat(openPrem), m=parseFloat(mark), q=parseInt(qty)||1, mu=parseInt(mult)||100;
+  if(isNaN(op)||isNaN(m)||op<=0) return null;
+  const currentVal = m * q * mu;
+  return Math.round((1-(currentVal/op))*100);
+}
+
+function fmt$(v, sign=false) {
+  const n=parseFloat(v);
+  if(isNaN(n)||v===null||v==='') return '—';
+  const abs=Math.abs(n).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+  if(sign) return (n>=0?'+$':'-$')+abs;
+  return '$'+abs;
+}
+
+function cleanNum(s) {
+  if(!s) return 0;
+  return parseFloat(String(s).replace(/[$,%]/g,'').replace(/,/g,''))||0;
+}
+
+function normDate(s) {
+  if(!s) return '';
+  // Handle "May 8, 2026", "3/18/26", "2026-03-17", "4/17/26" etc
+  const d=new Date(s);
+  if(!isNaN(d.getTime())) return d.toISOString().split('T')[0];
+  return s;
+}
+
+// Parse Tastytrade symbol to extract underlying
+function parseSymbol(sym, underlying) {
+  if(underlying) return underlying.trim().replace(/\s+/g,'');
+  // equity: "AAPL  260417P00245000" → AAPL
+  // futures: "./ESH6 E3CH6 260318C6770" → /ESH6
+  if(sym.startsWith('./')) return sym.split(' ')[0].replace('./','') + '_FUT';
+  const m = sym.match(/^([A-Z]+)\s/);
+  return m ? m[1] : sym.trim();
+}
+
+function isFutures(sym) {
+  return sym.startsWith('./')||sym.startsWith('/');
+}
+
+function itmBadge(itm) {
+  if(!itm) return '—';
+  const cls=itm.label==='ITM'?'br':itm.label==='ATM'?'ba':'bg';
+  return `<span class="badge ${cls}">${itm.label} ${Math.abs(itm.pct)}%</span>`;
+}
+
+function statusBadge(s) {
+  const m={open:'bb',closed:'bgy',rolled:'ba',assigned:'br',spread_short:'bp',spread_long:'bgy'};
+  return `<span class="badge ${m[s]||'bgy'}">${s.replace('_',' ')}</span>`;
+}
+
+function popColor(pop) {
+  const p=parseFloat(pop);
+  if(isNaN(p)) return '';
+  if(p>=65) return 'cg';
+  if(p>=50) return 'ca';
+  return 'cr';
+}
+
+// ═══════════════════════════════════════════════
+// POSITIONS CSV IMPORT
+// ═══════════════════════════════════════════════
+function handlePositions(e) {
+  const file=e.target.files[0]; if(!file) return;
+  const reader=new FileReader();
+  reader.onload=ev=>{
+    const lines=ev.target.result.split('\n').map(l=>l.trim()).filter(Boolean);
+    if(lines.length<2) return logImport('er','Positions file appears empty');
+    const headers=parseCsvLine(lines[0]).map(h=>h.toLowerCase().trim());
+    let updated=0;
+
+    for(let i=1;i<lines.length;i++) {
+      const cols=parseCsvLine(lines[i]);
+      const row={};
+      headers.forEach((h,j)=>row[h]=cols[j]||'');
+
+      const rawSym = row['symbol']||'';
+      const underlying = (row['underlying symbol']||row['root symbol']||'').trim();
+      const strike = cleanNum(row['strike price']);
+      const callPut = (row['call/put']||'').toLowerCase().includes('put')?'Put':'Call';
+      const expDate = normDate(row['exp date']||row['expiration date']||'');
+      const mark = cleanNum(row['mark']);
+      const lastClose = cleanNum(row['underlying last price']||row['underlying price']||'');
+      const pop = cleanNum(row['pop']);
+      const plOpen = cleanNum(row['p/l open']);
+      const cost = cleanNum(row['cost']);
+      const ivRank = cleanNum(row['iv rank']);
+      const theta = cleanNum(row['theta']);
+      const qty = Math.abs(cleanNum(row['quantity']));
+      const isFut = isFutures(rawSym);
+      const underlyingSym = isFut
+        ? (rawSym.split(' ')[0].replace('./','').replace('/',''))
+        : (underlying || rawSym.match(/^([A-Z]+)\s/)?.[1] || rawSym.trim());
+
+      if(!strike||!expDate) continue;
+
+      // Find matching open trade and update its live fields
+      const match = trades.find(t =>
+        t.status==='open' &&
+        Math.abs(parseFloat(t.strike)-strike)<0.001 &&
+        t.expDate===expDate &&
+        t.callPut===callPut &&
+        (t.underlyingSym===underlyingSym||t.symbol===rawSym.trim())
+      );
+
+      if(match) {
+        match.mark = mark;
+        match.lastClose = lastClose;
+        match.pop = pop||match.pop;
+        match.plOpen = plOpen;
+        match.ivRank = ivRank;
+        match.theta = theta;
+        match.premCaptured = calcPremCaptured(match.netPremium, mark, match.qty, match.multiplier||100);
+        updated++;
+      }
+    }
+
+    logImport('ok',`Positions: updated ${updated} open trade${updated!==1?'s':''} with current marks, PoP, P/L`);
+    saveToGH(); renderAll();
+    e.target.value='';
+  };
+  reader.readAsText(file);
+}
+
+// ═══════════════════════════════════════════════
+// TRANSACTIONS CSV IMPORT
+// ═══════════════════════════════════════════════
+function handleTransactions(e) {
+  const file=e.target.files[0]; if(!file) return;
+  const reader=new FileReader();
+  reader.onload=ev=>{
+    const lines=ev.target.result.split('\n').map(l=>l.trim()).filter(Boolean);
+    if(lines.length<2) return logImport('er','Transactions file appears empty');
+    const headers=parseCsvLine(lines[0]).map(h=>h.toLowerCase().trim());
+    let opened=0, closed=0, rolled=0, skipped=0, errors=0;
+
+    // Group by order # first to detect spreads and rolls
+    const orderMap={};
+    for(let i=1;i<lines.length;i++) {
+      const cols=parseCsvLine(lines[i]);
+      const row={};
+      headers.forEach((h,j)=>row[h]=cols[j]||'');
+      const orderKey=(row['order #']||'UNK')+'|'+(row['date']||'').split('T')[0];
+      if(!orderMap[orderKey]) orderMap[orderKey]=[];
+      orderMap[orderKey].push(row);
+    }
+
+    // Process each order
+    for(const [orderKey, rows] of Object.entries(orderMap)) {
+      // Dedup check
+      if(importedOrders[orderKey]) { skipped+=rows.length; continue; }
+
+      const actions=rows.map(r=>r['action']||'');
+      const hasOpen=actions.some(a=>a.includes('OPEN'));
+      const hasClose=actions.some(a=>a.includes('CLOSE'));
+      const isRoll=hasOpen&&hasClose;
+      const isSpread=rows.length>1&&!isRoll;
+
+      if(isRoll) {
+        // Roll: close old leg + open new leg
+        const closeRows=rows.filter(r=>(r['action']||'').includes('CLOSE'));
+        const openRows=rows.filter(r=>(r['action']||'').includes('OPEN'));
+
+        for(const cr of closeRows) {
+          const res=closePosition(cr, 'rolled');
+          if(res) rolled++;
+        }
+        for(const or of openRows) {
+          const res=openPosition(or, isSpread);
+          if(res) opened++;
+        }
+      } else if(isSpread) {
+        // Spread: multiple legs same order, all opens or all closes
+        const spreadId='spread_'+orderKey;
+        for(const row of rows) {
+          const action=row['action']||'';
+          if(action.includes('OPEN')) {
+            const res=openPosition(row, true, spreadId);
+            if(res) opened++;
+          } else if(action.includes('CLOSE')) {
+            const res=closePosition(row, 'closed');
+            if(res) closed++;
+          }
+        }
+      } else {
+        // Single leg
+        for(const row of rows) {
+          const action=row['action']||'';
+          if(action.includes('OPEN')) {
+            const res=openPosition(row, false);
+            if(res) opened++;
+            else errors++;
+          } else if(action.includes('CLOSE')) {
+            const res=closePosition(row, 'closed');
+            if(res) closed++;
+          }
+        }
+      }
+
+      importedOrders[orderKey]=true;
+    }
+
+    const now=new Date().toLocaleString();
+    logImport('ok',`Transactions: +${opened} opened, ${closed} closed, ${rolled} rolled, ${skipped} skipped (dupes)`);
+    if(errors>0) logImport('er',`${errors} rows could not be matched`);
+    document.getElementById('last-import-lbl').textContent='Last import: '+today();
+    saveToGH(); renderAll();
+    e.target.value='';
+  };
+  reader.readAsText(file);
+}
+
+function openPosition(row, isSpreadLeg=false, spreadId=null) {
+  const rawSym=(row['symbol']||'').trim();
+  const underlying=(row['underlying symbol']||row['root symbol']||'').trim();
+  const action=row['action']||'';
+  const isSTO=action.includes('SELL_TO_OPEN')||action.includes('Sell to Open');
+  const isBTO=action.includes('BUY_TO_OPEN')||action.includes('Buy to Open');
+  if(!isSTO&&!isBTO) return false;
+
+  const isFut=isFutures(rawSym);
+  const underlyingSym=isFut
+    ? rawSym.replace('./','').split(' ')[0]
+    : (underlying||rawSym.match(/^([A-Z]+)\s/)?.[1]||rawSym.trim());
+
+  const strike=cleanNum(row['strike price']);
+  const expDate=normDate(row['expiration date']||row['exp date']||'');
+  const callPut=(row['call or put']||'').toLowerCase().includes('call')?'Call':'Put';
+  const qty=Math.abs(cleanNum(row['quantity']));
+  const value=cleanNum(row['value']);
+  const total=cleanNum(row['total']);
+  const mult=cleanNum(row['multiplier'])||100;
+  const openDate=(row['date']||'').split('T')[0];
+  const orderId=(row['order #']||'');
+
+  const netPremium=Math.abs(value); // positive = credit received
+  const capital=strike*mult*qty;
+  const dte=calcDTE(expDate);
+
+  const trade={
+    id: Date.now()+Math.random(),
+    symbol: rawSym,
+    underlyingSym,
+    callPut,
+    instType: isFut?'futures':'equity',
+    strike, qty, expDate, openDate,
+    netPremium: isSTO?netPremium:-netPremium, // STO=credit, BTO=debit
+    capital, multiplier: mult,
+    lastClose: null, mark: null, pop: null,
+    plOpen: null, ivRank: null, theta: null,
+    premCaptured: null,
+    annYield: calcAnnYield(isSTO?netPremium:0, capital, dte),
+    status: isSpreadLeg?(isSTO?'spread_short':'spread_long'):'open',
+    spreadId, orderId,
+    closeDate: null, closePremium: null,
+    notes: ''
+  };
+
+  trades.unshift(trade);
+  return true;
+}
+
+function closePosition(row, closeStatus='closed') {
+  const rawSym=(row['symbol']||'').trim();
+  const underlying=(row['underlying symbol']||'').trim();
+  const isFut=isFutures(rawSym);
+  const underlyingSym=isFut
+    ? rawSym.replace('./','').split(' ')[0]
+    : (underlying||rawSym.match(/^([A-Z]+)\s/)?.[1]||rawSym.trim());
+
+  const strike=cleanNum(row['strike price']);
+  const expDate=normDate(row['expiration date']||row['exp date']||'');
+  const callPut=(row['call or put']||'').toLowerCase().includes('call')?'Call':'Put';
+  const qty=Math.abs(cleanNum(row['quantity']));
+  const value=cleanNum(row['value']);
+  const closeDate=(row['date']||'').split('T')[0];
+
+  // Find matching open trade
+  const match=trades.find(t=>
+    (t.status==='open'||t.status==='spread_short'||t.status==='spread_long')&&
+    Math.abs(parseFloat(t.strike)-strike)<0.001&&
+    t.expDate===expDate&&
+    t.callPut===callPut&&
+    (t.underlyingSym===underlyingSym||t.symbol===rawSym)
+  );
+
+  if(match) {
+    match.status=closeStatus;
+    match.closeDate=closeDate;
+    match.closePremium=Math.abs(value);
+    // Realized P/L: for STO positions, profit = openPrem - closePrem
+    match.realizedPL=(parseFloat(match.netPremium)||0)-Math.abs(value);
+    return true;
+  }
+  return false;
+}
+
+// ═══════════════════════════════════════════════
+// INITIAL POSITIONS IMPORT (first time setup)
+// ═══════════════════════════════════════════════
+// This is called if user imports positions CSV with no existing trades
+// It creates open trades from current positions snapshot
+function bootstrapFromPositions(lines, headers) {
+  let created=0;
+  for(let i=1;i<lines.length;i++) {
+    const cols=parseCsvLine(lines[i]);
+    const row={};
+    headers.forEach((h,j)=>row[h]=cols[j]||'');
+
+    const rawSym=(row['symbol']||'').trim();
+    if(!rawSym) continue;
+    const isFut=isFutures(rawSym);
+    const underlying=(row['underlying symbol']||row['root symbol']||'').trim();
+    const underlyingSym=isFut
+      ? rawSym.replace('./','').split(' ')[0]
+      : (underlying||rawSym.match(/^([A-Z]+)\s/)?.[1]||rawSym.trim());
+
+    const strike=cleanNum(row['strike price']);
+    const expDate=normDate(row['exp date']||row['expiration date']||'');
+    const callPut=(row['call/put']||'').toLowerCase().includes('put')?'Put':'Call';
+    const qty=Math.abs(cleanNum(row['quantity']));
+    const cost=cleanNum(row['cost']); // total premium collected (positive = credit)
+    const tradePrice=cleanNum(row['trade price']);
+    const mark=cleanNum(row['mark']);
+    const lastClose=cleanNum(row['underlying last price']||row['underlying price']||'');
+    const pop=cleanNum(row['pop']);
+    const plOpen=cleanNum(row['p/l open']);
+    const ivRank=cleanNum(row['iv rank']);
+    const theta=cleanNum(row['theta']);
+    const mult=100;
+    const capital=strike*mult*qty;
+    const dte=calcDTE(expDate);
+    const netPremium=Math.abs(cost)||Math.abs(tradePrice*mult*qty);
+
+    if(!strike||!expDate) continue;
+
+    // Determine if short (negative qty in tastytrade = short)
+    const isShort=cleanNum(row['quantity'])<0;
+    const isSpread=false; // can't reliably detect from positions alone
+
+    trades.push({
+      id: Date.now()+i+Math.random(),
+      symbol: rawSym, underlyingSym, callPut,
+      instType: isFut?'futures':'equity',
+      strike, qty, expDate,
+      openDate: today(),
+      netPremium: isShort?netPremium:-netPremium,
+      capital, multiplier: mult,
+      lastClose, mark, pop, plOpen, ivRank, theta,
+      premCaptured: calcPremCaptured(netPremium, mark, qty, mult),
+      annYield: calcAnnYield(isShort?netPremium:0, capital, dte),
+      status: 'open',
+      spreadId: null, orderId: 'bootstrap',
+      closeDate: null, closePremium: null, realizedPL: null,
+      notes: 'Imported from positions snapshot'
+    });
+    created++;
+  }
+  return created;
+}
+
+// Modified handlePositions to bootstrap if no existing trades
+const _origHandlePos = handlePositions;
+function handlePositions(e) {
+  const file=e.target.files[0]; if(!file) return;
+  const reader=new FileReader();
+  reader.onload=ev=>{
+    const lines=ev.target.result.split('\n').map(l=>l.trim()).filter(Boolean);
+    if(lines.length<2) { logImport('er','Empty file'); return; }
+    const headers=parseCsvLine(lines[0]).map(h=>h.toLowerCase().trim());
+    const openTrades=trades.filter(t=>t.status==='open'||t.status==='spread_short'||t.status==='spread_long');
+
+    if(openTrades.length===0) {
+      // First-time bootstrap
+      const created=bootstrapFromPositions(lines, headers);
+      logImport('ok',`Bootstrap: created ${created} trades from positions snapshot`);
+      logImport('inf','Now import your Transactions file to add history and enable roll detection.');
+      saveToGH(); renderAll();
+      e.target.value='';
+    } else {
+      // Daily update — just refresh marks/PoP
+      let updated=0;
+      for(let i=1;i<lines.length;i++) {
+        const cols=parseCsvLine(lines[i]);
+        const row={}; headers.forEach((h,j)=>row[h]=cols[j]||'');
+        const rawSym=(row['symbol']||'').trim();
+        const isFut=isFutures(rawSym);
+        const underlying=(row['underlying symbol']||row['root symbol']||'').trim();
+        const underlyingSym=isFut
+          ? rawSym.replace('./','').split(' ')[0]
+          : (underlying||rawSym.match(/^([A-Z]+)\s/)?.[1]||rawSym.trim());
+        const strike=cleanNum(row['strike price']);
+        const callPut=(row['call/put']||'').toLowerCase().includes('put')?'Put':'Call';
+        const expDate=normDate(row['exp date']||row['expiration date']||'');
+        const mark=cleanNum(row['mark']);
+        const lastClose=cleanNum(row['underlying last price']||'');
+        const pop=cleanNum(row['pop']);
+        const plOpen=cleanNum(row['p/l open']);
+        if(!strike||!expDate) continue;
+        const match=trades.find(t=>
+          (t.status==='open'||t.status==='spread_short'||t.status==='spread_long')&&
+          Math.abs(parseFloat(t.strike)-strike)<0.001&&
+          t.expDate===expDate&&
+          t.callPut===callPut&&
+          (t.underlyingSym===underlyingSym||t.symbol===rawSym)
+        );
+        if(match) {
+          if(mark) match.mark=mark;
+          if(lastClose) match.lastClose=lastClose;
+          if(pop) match.pop=pop;
+          if(plOpen!==0) match.plOpen=plOpen;
+          match.premCaptured=calcPremCaptured(match.netPremium, mark, match.qty, match.multiplier||100);
+          updated++;
+        }
+      }
+      logImport('ok',`Positions: updated ${updated} open trade${updated!==1?'s':''} with current marks, PoP, P/L`);
+      saveToGH(); renderAll();
+      e.target.value='';
+    }
+  };
+  reader.readAsText(file);
+}
+
+// ═══════════════════════════════════════════════
+// CSV PARSER
+// ═══════════════════════════════════════════════
+function parseCsvLine(line) {
+  const res=[]; let cur='', inQ=false;
+  for(let i=0;i<line.length;i++) {
+    const c=line[i];
+    if(c==='"') { inQ=!inQ; }
+    else if(c===','&&!inQ) { res.push(cur.trim()); cur=''; }
+    else cur+=c;
+  }
+  res.push(cur.trim()); return res;
+}
+
+// ═══════════════════════════════════════════════
+// IMPORT LOG
+// ═══════════════════════════════════════════════
+function logImport(type, msg) {
+  const el=document.getElementById('import-log');
+  el.style.display='block';
+  el.innerHTML+=`<div class="${type}">${type==='ok'?'✓':type==='er'?'✗':type==='sk'?'—':'ℹ'} ${msg}</div>`;
+  el.scrollTop=el.scrollHeight;
+}
+
+// ═══════════════════════════════════════════════
+// TRADES RENDER
+// ═══════════════════════════════════════════════
+function setTTab(t,btn) {
+  tTab=t;
+  document.querySelectorAll('#page-trades .tab').forEach(b=>b.classList.remove('active'));
+  if(btn) btn.classList.add('active');
+  renderTrades();
+}
+
+function sortBy(col) {
+  sortAsc=sortCol===col?!sortAsc:true; sortCol=col; renderTrades();
+}
+
+function getFilteredTrades() {
+  const q=(document.getElementById('t-search')?.value||'').toLowerCase();
+  const tf=document.getElementById('t-type')?.value||'';
+  const inst=document.getElementById('t-inst')?.value||'';
+  const openStatuses=['open','spread_short','spread_long'];
+  return trades
+    .filter(t=>tTab==='all'?true:tTab==='open'?openStatuses.includes(t.status):!openStatuses.includes(t.status))
+    .filter(t=>!q||t.underlyingSym?.toLowerCase().includes(q)||t.symbol?.toLowerCase().includes(q))
+    .filter(t=>!tf||t.callPut===tf)
+    .filter(t=>!inst||(inst==='futures'?t.instType==='futures':t.instType!=='futures'))
+    .sort((a,b)=>{
+      let av=a[sortCol],bv=b[sortCol];
+      if(typeof av==='string') av=av.toLowerCase();
+      if(typeof bv==='string') bv=bv.toLowerCase();
+      if(av==null) return 1; if(bv==null) return -1;
+      return (av<bv?-1:av>bv?1:0)*(sortAsc?1:-1);
+    });
+}
+
+function renderTrades() {
+  const openStatuses=['open','spread_short','spread_long'];
+  const open=trades.filter(t=>openStatuses.includes(t.status));
+  const totalPrem=open.reduce((s,t)=>s+(parseFloat(t.netPremium)||0),0);
+  const itmCnt=open.filter(t=>{const r=calcITMOTM(t.callPut,t.strike,t.lastClose);return r?.label==='ITM';}).length;
+  const avgDTE=open.length?Math.round(open.reduce((s,t)=>s+(calcDTE(t.expDate)||0),0)/open.length):0;
+  const closedPL=trades.filter(t=>t.status==='closed'||t.status==='rolled').reduce((s,t)=>s+(parseFloat(t.realizedPL)||0),0);
+
+  document.getElementById('t-stats').innerHTML=`
+    <div class="stat"><div class="sl">Open</div><div class="sv">${open.length}</div></div>
+    <div class="stat"><div class="sl">% ITM</div><div class="sv ${open.length&&itmCnt/open.length>.3?'cr':'cg'}">${open.length?((itmCnt/open.length)*100).toFixed(1):0}%</div><div class="ss">${itmCnt}/${open.length}</div></div>
+    <div class="stat"><div class="sl">Open premium</div><div class="sv cg">${fmt$(totalPrem)}</div></div>
+    <div class="stat"><div class="sl">Avg DTE</div><div class="sv">${avgDTE}d</div></div>
+    <div class="stat"><div class="sl">Realized P/L</div><div class="sv ${closedPL>=0?'cg':'cr'}">${fmt$(closedPL,true)}</div></div>
+  `;
+
+  const list=getFilteredTrades();
+  const tbody=document.getElementById('t-body');
+  const empty=document.getElementById('t-empty');
+
+  if(!list.length){tbody.innerHTML='';empty.style.display='block';return;}
+  empty.style.display='none';
+
+  // Group spreads together by spreadId
+  const spreadGroups={};
+  list.forEach(t=>{if(t.spreadId){if(!spreadGroups[t.spreadId])spreadGroups[t.spreadId]=[];spreadGroups[t.spreadId].push(t);}});
+
+  const rendered=new Set();
+  let html='';
+
+  list.forEach(t=>{
+    if(t.spreadId&&rendered.has(t.spreadId)) return;
+    if(t.spreadId) {
+      rendered.add(t.spreadId);
+      const legs=spreadGroups[t.spreadId]||[t];
+      const netPrem=legs.reduce((s,l)=>s+(parseFloat(l.netPremium)||0),0);
+      // Header row for spread group
+      html+=`<tr class="spread-group-hdr"><td colspan="17">SPREAD — Order ${t.orderId||''}  ·  Net: <strong>${fmt$(netPrem,true)}</strong></td></tr>`;
+      legs.forEach(leg=>{ html+=tradeRow(leg,true); });
+    } else {
+      html+=tradeRow(t,false);
+    }
+  });
+
+  tbody.innerHTML=html;
+}
+
+function tradeRow(t, isSpreadLeg) {
+  const dte=calcDTE(t.expDate);
+  const itm=calcITMOTM(t.callPut,t.strike,t.lastClose);
+  const ay=calcAnnYield(Math.max(parseFloat(t.netPremium)||0,0),t.capital,dte);
+  const prem=parseFloat(t.netPremium)||0;
+  const dteStr=dte===null?'—':(dte<0?`<span class="cr">${dte}d</span>`:`${dte}d`);
+  const popStr=t.pop?`<span class="${popColor(t.pop)}">${t.pop}%</span>`:'—';
+  const capPct=t.premCaptured!==null&&t.premCaptured!==undefined?`${t.premCaptured}%`:'—';
+  const sym=`<strong>${t.underlyingSym||t.symbol}</strong>${t.instType==='futures'?'<span class="fut-badge">FUT</span>':''}${isSpreadLeg?'<span class="spread-label">leg</span>':''}`;
+  const plStr=t.plOpen!==null&&t.plOpen!==undefined?`<span class="${parseFloat(t.plOpen)>=0?'cg':'cr'}">${fmt$(t.plOpen,true)}</span>`:'—';
+  return `<tr class="${isSpreadLeg?'spread-group':''}">
+    <td>${sym}</td>
+    <td><span class="badge ${t.instType==='futures'?'bp':'bgy'}">${t.instType==='futures'?'Futures':'Equity'}</span></td>
+    <td>${t.callPut||'—'}</td>
+    <td class="mono">${t.strike?'$'+parseFloat(t.strike).toFixed(2):'—'}</td>
+    <td>${t.qty||'—'}</td>
+    <td class="mono">${t.expDate||'—'}</td>
+    <td class="mono">${dteStr}</td>
+    <td class="mono" style="color:${prem>=0?'var(--green)':'var(--red)'}">${fmt$(t.netPremium)}</td>
+    <td class="mono">${t.mark?'$'+parseFloat(t.mark).toFixed(2):'—'}</td>
+    <td class="mono">${capPct}</td>
+    <td class="mono">${ay?ay+'%':'—'}</td>
+    <td>${popStr}</td>
+    <td class="mono">${t.lastClose?'$'+parseFloat(t.lastClose).toFixed(2):'—'}</td>
+    <td>${itmBadge(itm)}</td>
+    <td>${plStr}</td>
+    <td>${statusBadge(t.status)}</td>
+    <td><button class="btn btn-sm" onclick="deleteTrade(${t.id})" style="color:var(--text3)">✕</button></td>
+  </tr>`;
+}
+
+// ═══════════════════════════════════════════════
+// WORKFLOW RENDER
+// ═══════════════════════════════════════════════
+const BUCKETS=[
+  {id:'take-profits',label:'Take profits',color:'#7F77DD',desc:'Premium captured ≥ 50%'},
+  {id:'working',label:'Working',color:'#1D9E75',desc:'OTM, PoP ≥ 65%'},
+  {id:'warning',label:'Warning',color:'#EF9F27',desc:'ITM or PoP < 65%'},
+  {id:'urgent',label:'Urgent',color:'#D85A30',desc:'ITM + DTE < 14, or PoP < 35%'},
+  {id:'uncategorized',label:'Uncategorized',color:'#888780',desc:''}
+];
+
+function getBucket(t) {
+  const dte=calcDTE(t.expDate);
+  const itm=calcITMOTM(t.callPut,t.strike,t.lastClose);
+  const pop=parseFloat(t.pop)||null;
+  const cap=parseFloat(t.premCaptured)||0;
+
+  if(cap>=50) return 'take-profits';
+  if(pop!==null&&pop<35) return 'urgent';
+  if(itm?.label==='ITM'&&dte!==null&&dte<14) return 'urgent';
+  if(itm?.label==='ITM'||(pop!==null&&pop<65)) return 'warning';
+  return 'working';
+}
+
+function renderWorkflow() {
+  const openStatuses=['open','spread_short','spread_long'];
+  const open=trades.filter(t=>openStatuses.includes(t.status));
+  const totalPrem=open.reduce((s,t)=>s+(Math.max(parseFloat(t.netPremium)||0,0)),0);
+  const avgDTE=open.length?Math.round(open.reduce((s,t)=>s+(calcDTE(t.expDate)||0),0)/open.length):0;
+  const avgPoP=open.filter(t=>t.pop).length?Math.round(open.filter(t=>t.pop).reduce((s,t)=>s+(parseFloat(t.pop)||0),0)/open.filter(t=>t.pop).length):null;
+
+  document.getElementById('wf-stats').innerHTML=`
+    <div class="stat"><div class="sl">Open trades</div><div class="sv">${open.length}</div></div>
+    <div class="stat"><div class="sl">Total premium</div><div class="sv cg">${fmt$(totalPrem)}</div></div>
+    <div class="stat"><div class="sl">Avg DTE</div><div class="sv">${avgDTE}d</div></div>
+    ${avgPoP!==null?`<div class="stat"><div class="sl">Avg PoP</div><div class="sv ${avgPoP>=65?'cg':avgPoP>=50?'ca':'cr'}">${avgPoP}%</div></div>`:''}
+  `;
+
+  const wfEmpty=document.getElementById('wf-empty');
+  const wfBuckets=document.getElementById('wf-buckets');
+  if(!open.length){wfBuckets.innerHTML='';wfEmpty.style.display='block';return;}
+  wfEmpty.style.display='none';
+
+  const bucketed={};
+  BUCKETS.forEach(b=>bucketed[b.id]=[]);
+  open.forEach(t=>{const b=getBucket(t);(bucketed[b]||bucketed['uncategorized']).push(t);});
+
+  wfBuckets.innerHTML=BUCKETS.map(b=>{
+    const list=bucketed[b.id]; if(!list.length) return '';
+    const tp=list.reduce((s,t)=>s+(Math.max(parseFloat(t.netPremium)||0,0)),0);
+    const ad=Math.round(list.reduce((s,t)=>s+(calcDTE(t.expDate)||0),0)/list.length);
+    const apop=list.filter(t=>t.pop).length?Math.round(list.filter(t=>t.pop).reduce((s,t)=>s+(parseFloat(t.pop)||0),0)/list.filter(t=>t.pop).length):null;
+
+    const rows=list.map(t=>{
+      const dte=calcDTE(t.expDate);
+      const itm=calcITMOTM(t.callPut,t.strike,t.lastClose);
+      const popStr=t.pop?`<span class="${popColor(t.pop)}">${t.pop}%</span>`:'—';
+      const capStr=t.premCaptured!==null&&t.premCaptured!==undefined?`${t.premCaptured}%`:'—';
+      return `<tr>
+        <td><strong>${t.underlyingSym||t.symbol}</strong>${t.instType==='futures'?'<span class="fut-badge">FUT</span>':''}</td>
+        <td>${t.callPut}</td>
+        <td class="mono">${t.strike?'$'+parseFloat(t.strike).toFixed(2):'—'}</td>
+        <td>${t.qty}</td>
+        <td class="mono">${t.lastClose?'$'+parseFloat(t.lastClose).toFixed(2):'—'}</td>
+        <td class="mono">${dte!==null?dte+'d':'—'}</td>
+        <td class="mono" style="color:var(--green)">${fmt$(t.netPremium)}</td>
+        <td class="mono">${t.mark?'$'+parseFloat(t.mark).toFixed(2):'—'}</td>
+        <td class="mono">${capStr}</td>
+        <td>${popStr}</td>
+        <td>${itmBadge(itm)}</td>
+      </tr>`;
+    }).join('');
+
+    return `<div class="bucket">
+      <div class="bhdr" onclick="toggleBucket(this)">
+        <div class="bdot" style="background:${b.color}"></div>
+        <div class="bname">${b.label} <span style="font-size:11px;font-weight:400;color:var(--text3)">${b.desc}</span></div>
+        <div class="bcnt">${list.length}</div>
+      </div>
+      <div class="bmeta">
+        <div class="bmi"><div class="bml">Trades</div><div class="bmv">${list.length}</div></div>
+        <div class="bmi"><div class="bml">Premium</div><div class="bmv cg">${fmt$(tp)}</div></div>
+        <div class="bmi"><div class="bml">Avg DTE</div><div class="bmv">${ad}d</div></div>
+        ${apop!==null?`<div class="bmi"><div class="bml">Avg PoP</div><div class="bmv ${apop>=65?'cg':apop>=50?'ca':'cr'}">${apop}%</div></div>`:''}
+      </div>
+      <div class="bbody open">
+        <div class="tw"><table>
+          <thead><tr><th>Symbol</th><th>C/P</th><th>Strike</th><th>Qty</th><th>Underlying</th><th>DTE</th><th>Net prem</th><th>Mark</th><th>% Captured</th><th>PoP</th><th>ITM/OTM</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table></div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function toggleBucket(hdr) {
+  hdr.parentElement.querySelector('.bbody').classList.toggle('open');
+}
+
+// ═══════════════════════════════════════════════
+// WHEELS RENDER
+// ═══════════════════════════════════════════════
+function setWTab(t,btn) {
+  wTab=t;
+  document.querySelectorAll('#page-wheels .tab').forEach(b=>b.classList.remove('active'));
+  if(btn) btn.classList.add('active');
+  renderWheels();
+}
+
+function buildWheels() {
+  const byUnderlying={};
+  trades.forEach(t=>{
+    const key=t.underlyingSym||t.symbol;
+    if(!byUnderlying[key]) byUnderlying[key]=[];
+    byUnderlying[key].push(t);
+  });
+  return Object.entries(byUnderlying).map(([sym,legs])=>{
+    const sorted=[...legs].sort((a,b)=>new Date(a.openDate||0)-new Date(b.openDate||0));
+    const openStatuses=['open','spread_short','spread_long'];
+    const isOpen=sorted.some(t=>openStatuses.includes(t.status));
+    const totalPrem=sorted.reduce((s,t)=>s+(parseFloat(t.netPremium)||0),0);
+    return {sym,legs:sorted,isOpen,totalPrem,started:sorted[0]?.openDate||'—'};
+  }).sort((a,b)=>(b.isOpen?1:0)-(a.isOpen?1:0));
+}
+
+function renderWheels() {
+  const all=buildWheels();
+  const openStatuses=['open','spread_short','spread_long'];
+  const filtered=wTab==='all'?all:wTab==='open'?all.filter(w=>w.isOpen):all.filter(w=>!w.isOpen);
+  const el=document.getElementById('w-list');
+  const empty=document.getElementById('w-empty');
+  if(!filtered.length){el.innerHTML='';empty.style.display='block';return;}
+  empty.style.display='none';
+
+  el.innerHTML=filtered.map(w=>{
+    const lastOpen=w.legs.find(l=>openStatuses.includes(l.status));
+    const legHtml=w.legs.map((t,i)=>{
+      const isOpen=openStatuses.includes(t.status);
+      const isRolled=t.status==='rolled';
+      const isSpread=t.status==='spread_short'||t.status==='spread_long';
+      const prem=parseFloat(t.netPremium)||0;
+      const arrow=i>0?'<span class="carr">→</span>':'';
+      const typeLabel=isRolled?'↺ Rolled':isOpen?'○ Open':'✓ Closed';
+      return `${arrow}<div class="leg${isOpen?' open':isRolled?' rolled':' closed'}${isSpread?' spread-leg':''}">
+        <div class="ltype">${typeLabel} · ${t.callPut}${isSpread?` <span style="font-size:10px">(${t.status==='spread_short'?'short':'long'})</span>`:''}</div>
+        <div class="lstrike">$${parseFloat(t.strike||0).toFixed(2)}</div>
+        <div class="lexp">${t.expDate||'—'}${t.pop?` · PoP ${t.pop}%`:''}</div>
+        <div class="lprem ${prem>=0?'pos':'neg'}">${fmt$(prem,true)}</div>
+      </div>`;
+    }).join('');
+
+    const dur=w.started&&w.legs[w.legs.length-1]?.expDate
+      ?Math.round((new Date(w.legs[w.legs.length-1].expDate)-new Date(w.started))/86400000):null;
+
+    return `<div class="wcard">
+      <div class="wtop">
+        <div>
+          <div class="wticker">${w.sym}${w.legs[0]?.instType==='futures'?'<span class="fut-badge">FUT</span>':''}</div>
+          <div class="wmeta">Started ${w.started} · ${w.legs.length} leg${w.legs.length!==1?'s':''}</div>
+        </div>
+        <div class="wpnl">
+          <div class="wpnll">Net P/L</div>
+          <div class="wpnlv ${w.totalPrem>=0?'cg':'cr'}">${fmt$(w.totalPrem,true)}</div>
+        </div>
+      </div>
+      <div class="wchain"><div class="wchain-inner">${legHtml}</div></div>
+      <div class="wfoot">
+        <span>Net premiums: <strong class="cg">${fmt$(w.totalPrem)}</strong>${dur!==null?' · Duration: '+dur+'d':''}</span>
+        ${lastOpen?.lastClose?`<span>Underlying: $${parseFloat(lastOpen.lastClose).toFixed(2)}</span>`:''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ═══════════════════════════════════════════════
+// MANUAL TRADE
+// ═══════════════════════════════════════════════
+function saveManualTrade() {
+  const sym=document.getElementById('f-sym').value.trim().toUpperCase();
+  if(!sym){alert('Symbol required');return;}
+  const strike=parseFloat(document.getElementById('f-strike').value)||0;
+  const qty=parseInt(document.getElementById('f-qty').value)||1;
+  const expDate=document.getElementById('f-exp').value;
+  const prem=parseFloat(document.getElementById('f-prem').value)||0;
+  const capital=parseFloat(document.getElementById('f-cap').value)||(strike*100*qty);
+  const dte=calcDTE(expDate);
+  const isSTO=document.getElementById('f-action').value==='STO';
+  trades.unshift({
+    id:Date.now()+Math.random(), symbol:sym, underlyingSym:sym,
+    callPut:document.getElementById('f-cp').value,
+    instType:document.getElementById('f-inst').value,
+    strike, qty, expDate, openDate:document.getElementById('f-odate').value||today(),
+    netPremium:isSTO?Math.abs(prem):-Math.abs(prem), capital, multiplier:100,
+    lastClose:parseFloat(document.getElementById('f-last').value)||null,
+    mark:null, pop:parseFloat(document.getElementById('f-pop').value)||null,
+    plOpen:null, ivRank:null, theta:null, premCaptured:null,
+    annYield:calcAnnYield(isSTO?prem:0,capital,dte),
+    status:'open', spreadId:null, orderId:'manual',
+    closeDate:null, closePremium:null, realizedPL:null,
+    notes:document.getElementById('f-notes').value
+  });
+  saveToGH(); closeM('add-mo'); renderAll();
+}
+
+function deleteTrade(id) {
+  if(!confirm('Delete this trade?')) return;
+  trades=trades.filter(t=>t.id!==id);
+  saveToGH(); renderAll();
+}
+
+// ═══════════════════════════════════════════════
+// TASTYTRADE API
+// ═══════════════════════════════════════════════
+async function connectTT() {
+  const user=document.getElementById('tt-u').value.trim();
+  const pass=document.getElementById('tt-p').value;
+  const el=document.getElementById('tt-res');
+  el.style.display='block'; el.style.color='var(--text3)'; el.textContent='Connecting…';
+  try {
+    const r=await fetch('https://api.tastytrade.com/sessions',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({'login':user,'password':pass,'remember-me':false})});
+    if(!r.ok){el.textContent='Login failed.';el.style.color='var(--red)';document.getElementById('cors-warn').style.display='block';return;}
+    const d=await r.json();
+    const token=d?.data?.['session-token'];
+    if(!token){el.textContent='No token returned.';el.style.color='var(--red)';return;}
+    el.textContent='Fetching positions…';
+    const ar=await fetch('https://api.tastytrade.com/customers/me/accounts',{headers:{'Authorization':token}});
+    const ad=await ar.json();
+    const acct=ad?.data?.items?.[0]?.account?.['account-number'];
+    if(!acct){el.textContent='No accounts found.';el.style.color='var(--red)';return;}
+    const pr=await fetch(`https://api.tastytrade.com/accounts/${acct}/positions`,{headers:{'Authorization':token}});
+    const pd=await pr.json();
+    let added=0;
+    (pd?.data?.items||[]).forEach((p,i)=>{
+      if(p['instrument-type']!=='Equity Option'&&p['instrument-type']!=='Future Option') return;
+      const isFut=p['instrument-type']==='Future Option';
+      const underlyingSym=(p['underlying-symbol']||'').trim();
+      const strike=parseFloat(p['strike-price']||0);
+      const expDate=normDate(p['expiration-date']||'');
+      const callPut=/call/i.test(p['call-or-put']||'')?'Call':'Put';
+      const qty=Math.abs(parseInt(p['quantity']||1));
+      const cost=Math.abs(parseFloat(p['average-open-price']||0))*100*qty;
+      const mark=parseFloat(p['close-price']||0)||null;
+      const dte=calcDTE(expDate);
+      trades.push({
+        id:Date.now()+i+Math.random(), symbol:p['symbol']||underlyingSym, underlyingSym,
+        callPut, instType:isFut?'futures':'equity', strike, qty, expDate,
+        openDate:today(), netPremium:cost, capital:strike*100*qty, multiplier:100,
+        lastClose:null, mark, pop:null, plOpen:null, ivRank:null, theta:null, premCaptured:null,
+        annYield:calcAnnYield(cost,strike*100*qty,dte), status:'open',
+        spreadId:null, orderId:'api', closeDate:null, closePremium:null, realizedPL:null, notes:''
+      });
+      added++;
+    });
+    saveToGH(); renderAll();
+    el.textContent=`✓ Imported ${added} positions. Token valid ~24h.`;
+    el.style.color='var(--green)';
+    document.getElementById('tt-btn').className='btn btn-sm btn-conn';
+    document.getElementById('tt-btn').textContent='Tastytrade ✓';
+  } catch(err){
+    el.textContent='Error: '+err.message; el.style.color='var(--red)';
+    document.getElementById('cors-warn').style.display='block';
+  }
+}
+
+// ═══════════════════════════════════════════════
+// EXPORT / CLEAR
+// ═══════════════════════════════════════════════
+function exportJSON() {
+  const b=new Blob([JSON.stringify({trades,importedOrders},null,2)],{type:'application/json'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='wheel-tracker-'+today()+'.json';a.click();
+}
+function exportCSV() {
+  const h=['Symbol','Underlying','C/P','Strike','Qty','Exp','Open Date','Net Premium','Capital','Mark','PoP','Last Close','Status','Realized P/L'];
+  const rows=trades.map(t=>[t.symbol,t.underlyingSym,t.callPut,t.strike,t.qty,t.expDate,t.openDate,t.netPremium,t.capital,t.mark||'',t.pop||'',t.lastClose||'',t.status,t.realizedPL||''].join(','));
+  const b=new Blob([[h.join(','),...rows].join('\n')],{type:'text/csv'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='wheel-tracker-'+today()+'.csv';a.click();
+}
+function clearAll() {
+  if(!confirm('Delete ALL data? Cannot be undone.')) return;
+  trades=[]; importedOrders={}; ghSha=null;
+  saveToGH(); renderAll();
+}
+
+// ═══════════════════════════════════════════════
+// MISC UI
+// ═══════════════════════════════════════════════
+function showPage(id,btn) {
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nbtn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('page-'+id).classList.add('active');
+  if(btn) btn.classList.add('active');
+  renderAll();
+}
+function openM(id){document.getElementById(id).classList.add('open');}
+function closeM(id){document.getElementById(id).classList.remove('open');}
+document.querySelectorAll('.mo').forEach(m=>m.addEventListener('click',e=>{if(e.target===m)m.classList.remove('open');}));
+
+function renderAll(){renderTrades();renderWorkflow();renderWheels();renderImportHistory();}
+
+function renderImportHistory() {
+  const keys=Object.keys(importedOrders);
+  const el=document.getElementById('import-history');
+  if(!keys.length){el.textContent='No imports yet.';return;}
+  const dates=[...new Set(keys.map(k=>k.split('|')[1]))].sort().reverse().slice(0,5);
+  el.innerHTML=dates.map(d=>{
+    const cnt=keys.filter(k=>k.endsWith('|'+d)).length;
+    return `<div>${d} — ${cnt} order${cnt!==1?'s':''} imported</div>`;
+  }).join('')+(dates.length<Object.keys(importedOrders).length?`<div style="color:var(--text3)">+${Object.keys(importedOrders).length-dates.reduce((s,d)=>s+keys.filter(k=>k.endsWith('|'+d)).length,0)} more orders</div>`:'');
+}
+</script>
+</body>
+</html>
