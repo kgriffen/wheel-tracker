@@ -543,6 +543,7 @@ async function loadFromGH(){
     wfColHidden=p.wfColHidden||{};
     localStorage.setItem('wt_data',JSON.stringify({positions,buckets,colWidths,colHidden,posImportDate,wfColOrder,wfColWidths,wfColHidden}));
     showSync('ok','Synced ✓');
+    sanitizeColState();
     migrateBucketOrder();
     renderAll();
   }catch(e){loadLocal();showSync('err','GitHub error — using local');}
@@ -560,6 +561,7 @@ function loadLocal(){
     wfColWidths=d.wfColWidths||{};
     wfColHidden=d.wfColHidden||{};
   }catch(e){positions=[];buckets=DEFAULT_BUCKETS;colWidths={};}
+  sanitizeColState();
   migrateBucketOrder();
   renderAll();
 }
@@ -1270,7 +1272,9 @@ function renderWorkflow(){
   const uncategorized=positions.filter(p=>!matched.has(p));
 
   renderWFStats(positions);
+  // Ensure all WF_COLS keys are in wfColOrder (adds newly introduced columns)
   if(!wfColOrder.length) wfColOrder=WF_COLS.map(c=>c.key);
+  else { WF_COLS.forEach(c=>{ if(!wfColOrder.includes(c.key)) wfColOrder.push(c.key); }); }
 
   wfList.innerHTML=buckets.map(b=>{
     const list=bucketPositions[b.id]||[];
@@ -1381,7 +1385,9 @@ function wfSortVal(p, colKey){
 }
 
 function renderWFTable(list, bucketId){
+  // Ensure all WF_COLS keys are in wfColOrder (adds newly introduced columns)
   if(!wfColOrder.length) wfColOrder=WF_COLS.map(c=>c.key);
+  else { WF_COLS.forEach(c=>{ if(!wfColOrder.includes(c.key)) wfColOrder.push(c.key); }); }
   const ss=wfSortState[bucketId]||{col:'',asc:true};
   const sorted=ss.col?[...list].sort((a,b)=>{
     const av=wfSortVal(a,ss.col), bv=wfSortVal(b,ss.col);
@@ -1679,6 +1685,18 @@ function resetWFCols(){
   wfSortState={};
   saveToGH();
   renderWorkflow();
+}
+
+
+// Ensure column state is consistent after load or when new columns are added
+function sanitizeColState(){
+  // Add any new ALL_COLS keys not in colOrder
+  ALL_COLS.forEach(c=>{ if(!colOrder.includes(c.key)) colOrder.push(c.key); });
+  // Un-hide any columns in ESSENTIAL_COLS that got stuck hidden
+  ESSENTIAL_COLS.forEach(k=>{ delete colHidden[k]; });
+  // Add any new WF_COLS keys not in wfColOrder
+  if(!wfColOrder.length) wfColOrder=WF_COLS.map(c=>c.key);
+  else { WF_COLS.forEach(c=>{ if(!wfColOrder.includes(c.key)) wfColOrder.push(c.key); }); }
 }
 
 function renderAll(){renderPositions();renderWorkflow();}
