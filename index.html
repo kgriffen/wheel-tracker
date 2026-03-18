@@ -292,7 +292,10 @@ input[type=checkbox]{width:13px;height:13px;cursor:pointer;accent-color:var(--tx
   </div>
   <div class="sg" id="wf-stats"></div>
   <div id="wf-buckets-list"></div>
-  <div class="wf-add-bucket" onclick="openBucketBuilder(null)">+ Add bucket</div>
+  <div style="display:flex;gap:8px;margin-bottom:10px;align-items:center">
+    <div class="wf-add-bucket" onclick="openBucketBuilder(null)" style="flex:1;margin-bottom:0">+ Add bucket</div>
+    <button class="btn btn-sm" onclick="resetWFCols()" style="white-space:nowrap">Reset columns</button>
+  </div>
   <div id="wf-uncategorized"></div>
   <div id="wf-empty" class="empty" style="display:none">
     <div style="font-size:26px">⚡</div>
@@ -424,6 +427,10 @@ let ghCfg = { user:'kgriffen', repo:'wheel-tracker', token:'' };
 let ghSha = null;
 let posImportDate = '';
 let sortState = { col:'', asc:true };
+let wfColOrder = [];    // workflow column order
+let wfColWidths = {};   // workflow column widths
+let wfColHidden = {};   // workflow hidden columns
+let wfSortState = {};   // { bucketId: { col, asc } }
 
 const SWATCH_COLORS = ['#7F77DD','#1D9E75','#EF9F27','#D85A30','#185FA5','#E87B3B','#0F9B8E','#D4537E'];
 
@@ -529,7 +536,10 @@ async function loadFromGH(){
     colWidths=p.colWidths||{};
     colHidden=p.colHidden||{};
     posImportDate=p.posImportDate||'';
-    localStorage.setItem('wt_data',JSON.stringify({positions,buckets,colWidths,posImportDate}));
+    wfColOrder=p.wfColOrder||[];
+    wfColWidths=p.wfColWidths||{};
+    wfColHidden=p.wfColHidden||{};
+    localStorage.setItem('wt_data',JSON.stringify({positions,buckets,colWidths,colHidden,posImportDate,wfColOrder,wfColWidths,wfColHidden}));
     showSync('ok','Synced ✓');
     migrateBucketOrder();
     renderAll();
@@ -544,13 +554,16 @@ function loadLocal(){
     colWidths=d.colWidths||{};
     colHidden=d.colHidden||{};
     posImportDate=d.posImportDate||'';
+    wfColOrder=d.wfColOrder||[];
+    wfColWidths=d.wfColWidths||{};
+    wfColHidden=d.wfColHidden||{};
   }catch(e){positions=[];buckets=DEFAULT_BUCKETS;colWidths={};}
   migrateBucketOrder();
   renderAll();
 }
 
 async function saveToGH(){
-  const data={positions,buckets,colWidths,colHidden,posImportDate,updated:new Date().toISOString()};
+  const data={positions,buckets,colWidths,colHidden,posImportDate,wfColOrder,wfColWidths,wfColHidden,updated:new Date().toISOString()};
   localStorage.setItem('wt_data',JSON.stringify(data));
   if(!ghCfg.token)return;
   showSync('syncing','Saving…');
@@ -1202,7 +1215,6 @@ function renderWorkflow(){
   }
   wfEmpty.style.display='none';
 
-  // Assign positions to first matching bucket
   const matched=new Set();
   const bucketPositions={};
   buckets.forEach(b=>{
@@ -1217,51 +1229,21 @@ function renderWorkflow(){
   const uncategorized=positions.filter(p=>!matched.has(p));
 
   renderWFStats(positions);
+  if(!wfColOrder.length) wfColOrder=WF_COLS.map(c=>c.key);
 
   wfList.innerHTML=buckets.map(b=>{
     const list=bucketPositions[b.id]||[];
     const totalPL=list.reduce((s,p)=>s+(cleanNum(p['P/L Open'])||0),0);
     const avgDTE=list.length?Math.round(list.reduce((s,p)=>s+(parseDays(p['DTE'])||0),0)/list.length):0;
-    const avgPoP=list.filter(p=>cleanNum(p['PoP'])!=null).length
-      ?Math.round(list.filter(p=>cleanNum(p['PoP'])!=null).reduce((s,p)=>s+(cleanNum(p['PoP'])||0),0)/list.filter(p=>cleanNum(p['PoP'])!=null).length):null;
-
-    const condSummary=b.conditions.map(c=>{
-      const f=COND_FIELDS.find(x=>x.value===c.field);
-      return `${f?f.label:c.field} ${c.op} ${c.value}`;
-    }).join(' AND ');
-
-    const rows=list.map(p=>{
-      const derived=deriveFields(p);
-      const sym=p['Symbol']||'';
-      const symShort=sym.split(' ')[0].replace('./','');
-      const plPct=cleanNum(p['P/L Opn%']);
-      const plDol=cleanNum(p['P/L Open']);
-      const pop=cleanNum(p['PoP']);
-      const dte=parseDays(p['DTE']);
-      const daysOpn=parseDays(p["D's Opn"]);
-      const itm=derived.itmOtm;
-      return `<tr>
-        <td><strong style="font-size:11px">${symShort}</strong></td>
-        <td>${p['Call/Put']==='Put'?'<span class="badge br">P</span>':'<span class="badge bg">C</span>'}</td>
-        <td class="mono num-r">$${parseFloat(p['Strike Price']||0).toFixed(p['Strike Price']<10?4:2)}</td>
-        <td class="mono num-r">${dte!==null?dte+'d':'—'}</td>
-        <td class="mono num-r">${daysOpn!==null?daysOpn+'d':'—'}</td>
-        <td class="mono num-r ${plDol>=0?'cg':'cr'}">${plDol!==null?(plDol>=0?'+$':'-$')+Math.abs(plDol).toFixed(0):'—'}</td>
-        <td class="mono num-r ${plPct>=0?'cg':'cr'}">${plPct!==null?plPct.toFixed(1)+'%':'—'}</td>
-        <td class="mono num-r ${pop>=65?'cg':pop>=50?'ca':'cr'}">${pop!==null?pop+'%':'—'}</td>
-        <td><span class="badge ${itm==='ITM'?'br':itm==='ATM'?'ba':'bg'}">${itm||'—'}</span></td>
-      </tr>`;
-    }).join('');
-
+    const popsArr=list.filter(p=>cleanNum(p['PoP'])!=null);
+    const pop=popsArr.length?Math.round(popsArr.reduce((s,p)=>s+(cleanNum(p['PoP'])||0),0)/popsArr.length):null;
+    const condSummary=b.conditions.map(c=>{const f=COND_FIELDS.find(x=>x.value===c.field);return `${f?f.label:c.field} ${c.op} ${c.value}`;}).join(' AND ');
     const bIdx=buckets.findIndex(x=>x.id===b.id);
     return `<div class="wf-bucket" draggable="true" data-bucket-id="${b.id}"
-      ondragstart="bucketDragStart(event,this)"
-      ondragover="bucketDragOver(event,this)"
-      ondragleave="bucketDragLeave(this)"
-      ondrop="bucketDrop(event,this)"
-      ondragend="bucketDragEnd(this)">
+      ondragstart="bucketDragStart(event,this)" ondragover="bucketDragOver(event,this)"
+      ondragleave="bucketDragLeave(this)" ondrop="bucketDrop(event,this)" ondragend="bucketDragEnd(this)">
       <div class="wf-bhdr" onclick="toggleWFBucket(this)">
-        <span class="wf-drag-handle" title="Drag to reorder" onclick="event.stopPropagation()">⠿</span>
+        <span class="wf-drag-handle" onclick="event.stopPropagation()">⠿</span>
         <span class="wf-order-badge">${bIdx+1}</span>
         <div class="wf-bdot" style="background:${b.color}"></div>
         <div class="wf-bname">${b.name}</div>
@@ -1275,73 +1257,26 @@ function renderWorkflow(){
         <div class="wf-bmi"><div class="wf-bml">Positions</div><div class="wf-bmv">${list.length}</div></div>
         <div class="wf-bmi"><div class="wf-bml">P/L Open</div><div class="wf-bmv ${totalPL>=0?'cg':'cr'}">${totalPL>=0?'+$':'-$'}${Math.abs(totalPL).toFixed(0)}</div></div>
         <div class="wf-bmi"><div class="wf-bml">Avg DTE</div><div class="wf-bmv">${avgDTE}d</div></div>
-        ${avgPoP!==null?`<div class="wf-bmi"><div class="wf-bml">Avg PoP</div><div class="wf-bmv ${avgPoP>=65?'cg':avgPoP>=50?'ca':'cr'}">${avgPoP}%</div></div>`:''}
+        ${pop!==null?`<div class="wf-bmi"><div class="wf-bml">Avg PoP</div><div class="wf-bmv ${pop>=65?'cg':pop>=50?'ca':'cr'}">${pop}%</div></div>`:''}
       </div>`:''}
       <div class="wf-bbody ${list.length?'open':''}">
-        ${list.length?`<div style="overflow-x:auto"><table style="width:100%">
-          <thead><tr style="background:var(--surf2)">
-            <th style="text-align:left;padding:5px 10px;font-size:10px;color:var(--tx3);font-weight:500;text-transform:uppercase">Symbol</th>
-            <th style="padding:5px 6px;font-size:10px;color:var(--tx3);font-weight:500;text-transform:uppercase">C/P</th>
-            <th style="text-align:right;padding:5px 10px;font-size:10px;color:var(--tx3);font-weight:500;text-transform:uppercase">Strike</th>
-            <th style="text-align:right;padding:5px 10px;font-size:10px;color:var(--tx3);font-weight:500;text-transform:uppercase">DTE</th>
-            <th style="text-align:right;padding:5px 10px;font-size:10px;color:var(--tx3);font-weight:500;text-transform:uppercase">D's Opn</th>
-            <th style="text-align:right;padding:5px 10px;font-size:10px;color:var(--tx3);font-weight:500;text-transform:uppercase">P/L $</th>
-            <th style="text-align:right;padding:5px 10px;font-size:10px;color:var(--tx3);font-weight:500;text-transform:uppercase">P/L %</th>
-            <th style="text-align:right;padding:5px 10px;font-size:10px;color:var(--tx3);font-weight:500;text-transform:uppercase">PoP</th>
-            <th style="text-align:left;padding:5px 10px;font-size:10px;color:var(--tx3);font-weight:500;text-transform:uppercase">ITM/OTM</th>
-          </tr></thead>
-          <tbody>${rows}</tbody>
-        </table></div>`:'<div style="padding:12px 13px;font-size:12px;color:var(--tx3)">No positions match this bucket\'s conditions.</div>'}
+        ${list.length?renderWFTable(list,b.id):'<div style="padding:10px 13px;font-size:12px;color:var(--tx3)">No positions match.</div>'}
       </div>
     </div>`;
   }).join('');
 
-  // Uncategorized
   if(uncategorized.length){
-    const rows=uncategorized.map(p=>{
-      const derived=deriveFields(p);
-      const sym=p['Symbol']||'';
-      const symShort=sym.split(' ')[0].replace('./','');
-      const plPct=cleanNum(p['P/L Opn%']);
-      const plDol=cleanNum(p['P/L Open']);
-      const pop=cleanNum(p['PoP']);
-      const dte=parseDays(p['DTE']);
-      const itm=derived.itmOtm;
-      return `<tr>
-        <td><strong style="font-size:11px">${symShort}</strong></td>
-        <td>${p['Call/Put']==='Put'?'<span class="badge br">P</span>':'<span class="badge bg">C</span>'}</td>
-        <td class="mono num-r">$${parseFloat(p['Strike Price']||0).toFixed(2)}</td>
-        <td class="mono num-r">${dte!==null?dte+'d':'—'}</td>
-        <td class="mono num-r ${plDol>=0?'cg':'cr'}">${plDol!==null?(plDol>=0?'+$':'-$')+Math.abs(plDol).toFixed(0):'—'}</td>
-        <td class="mono num-r ${plPct>=0?'cg':'cr'}">${plPct!==null?plPct.toFixed(1)+'%':'—'}</td>
-        <td class="mono num-r ${pop>=65?'cg':pop>=50?'ca':'cr'}">${pop!==null?pop+'%':'—'}</td>
-        <td><span class="badge ${itm==='ITM'?'br':itm==='ATM'?'ba':'bg'}">${itm||'—'}</span></td>
-      </tr>`;
-    }).join('');
     wfUncat.innerHTML=`<div class="wf-bucket">
       <div class="wf-bhdr" onclick="toggleWFBucket(this)">
         <div class="wf-bdot" style="background:#888780"></div>
         <div class="wf-bname">Uncategorized</div>
         <div class="wf-bcnt">${uncategorized.length}</div>
       </div>
-      <div class="wf-bbody open"><div style="overflow-x:auto"><table style="width:100%">
-        <thead><tr style="background:var(--surf2)">
-          <th style="text-align:left;padding:5px 10px;font-size:10px;color:var(--tx3);font-weight:500;text-transform:uppercase">Symbol</th>
-          <th style="padding:5px 6px;font-size:10px;color:var(--tx3);font-weight:500">C/P</th>
-          <th style="text-align:right;padding:5px 10px;font-size:10px;color:var(--tx3);font-weight:500;text-transform:uppercase">Strike</th>
-          <th style="text-align:right;padding:5px 10px;font-size:10px;color:var(--tx3);font-weight:500;text-transform:uppercase">DTE</th>
-          <th style="text-align:right;padding:5px 10px;font-size:10px;color:var(--tx3);font-weight:500;text-transform:uppercase">P/L $</th>
-          <th style="text-align:right;padding:5px 10px;font-size:10px;color:var(--tx3);font-weight:500;text-transform:uppercase">P/L %</th>
-          <th style="text-align:right;padding:5px 10px;font-size:10px;color:var(--tx3);font-weight:500;text-transform:uppercase">PoP</th>
-          <th style="text-align:left;padding:5px 10px;font-size:10px;color:var(--tx3);font-weight:500;text-transform:uppercase">ITM/OTM</th>
-        </tr></thead>
-        <tbody>${rows}</tbody>
-      </table></div></div>
+      <div class="wf-bbody open">${renderWFTable(uncategorized,'uncat')}</div>
     </div>`;
-  } else {
-    wfUncat.innerHTML='';
-  }
+  } else { wfUncat.innerHTML=''; }
 }
+
 
 function renderWFStats(list){
   const open=list.filter(p=>cleanNum(p['Quantity'])<0);
@@ -1356,6 +1291,166 @@ function renderWFStats(list){
     <div class="stat"><div class="sl">ITM count</div><div class="sv ${itm>0?'cr':'cg'}">${itm}</div></div>
   `;
 }
+
+// ═══════════════════════════════════════════════════════════
+// WORKFLOW TABLE COLUMNS
+// ═══════════════════════════════════════════════════════════
+const WF_COLS = [
+  {key:'Symbol',            label:'Symbol',     width:130, sortable:true,  fmt:'wf-symbol'},
+  {key:'_bucket',           label:'Bucket',     width:110, sortable:true,  fmt:'wf-bucket'},
+  {key:'Call/Put',          label:'C/P',        width:40,  sortable:true,  fmt:'wf-cp'},
+  {key:'Strike Price',      label:'Strike',     width:72,  sortable:true,  fmt:'price4'},
+  {key:'Quantity',          label:'Qty',        width:40,  sortable:true,  fmt:'qty'},
+  {key:'Exp Date',          label:'Exp',        width:90,  sortable:true,  fmt:'text'},
+  {key:'DTE',               label:'DTE',        width:44,  sortable:true,  fmt:'dte'},
+  {key:"D's Opn",           label:"D's Opn",    width:52,  sortable:true,  fmt:'days'},
+  {key:'Trade Price',       label:'Trd Prc',    width:65,  sortable:true,  fmt:'price4'},
+  {key:'Mark',              label:'Mark',       width:65,  sortable:true,  fmt:'price4'},
+  {key:'P/L Open',          label:'P/L $',      width:72,  sortable:true,  fmt:'pl-money'},
+  {key:'P/L Opn%',          label:'P/L %',      width:60,  sortable:true,  fmt:'pl-pct'},
+  {key:'P/L Day',           label:'P/L Day',    width:65,  sortable:true,  fmt:'pl-money'},
+  {key:'PoP',               label:'PoP',        width:50,  sortable:true,  fmt:'pop'},
+  {key:'IV Rank',           label:'IVR',        width:44,  sortable:true,  fmt:'num1'},
+  {key:'Underlying Last Price', label:'Last',   width:75,  sortable:true,  fmt:'price2'},
+  {key:'β Delta',           label:'β Δ',        width:55,  sortable:true,  fmt:'num2'},
+  {key:'/ Delta',           label:'Δ',          width:50,  sortable:true,  fmt:'num2'},
+  {key:'Theta',             label:'θ',          width:50,  sortable:true,  fmt:'num2'},
+  {key:'Cost',              label:'Cost',       width:72,  sortable:true,  fmt:'money'},
+  {key:'Sector',            label:'Sector',     width:100, sortable:true,  fmt:'text'},
+];
+
+function wfSortVal(p, colKey){
+  if(colKey==='_bucket'){
+    const b=getBucketForPosition(p);
+    if(!b) return 'zzz';
+    return String(buckets.findIndex(x=>x.id===b.id)).padStart(3,'0');
+  }
+  const col=WF_COLS.find(c=>c.key===colKey);
+  if(!col) return null;
+  const val=p[colKey];
+  if(col.fmt==='dte'||col.fmt==='days') return parseDays(val);
+  if(['money','pl-money','pl-pct','pop','num1','num2','price2','price4','qty'].includes(col.fmt)) return cleanNum(val);
+  return String(val||'').toLowerCase();
+}
+
+function renderWFTable(list, bucketId){
+  if(!wfColOrder.length) wfColOrder=WF_COLS.map(c=>c.key);
+  const ss=wfSortState[bucketId]||{col:'',asc:true};
+  const sorted=ss.col?[...list].sort((a,b)=>{
+    const av=wfSortVal(a,ss.col), bv=wfSortVal(b,ss.col);
+    if(av===null) return 1; if(bv===null) return -1;
+    return (av<bv?-1:av>bv?1:0)*(ss.asc?1:-1);
+  }):[...list];
+
+  const cols=wfColOrder.map(k=>WF_COLS.find(c=>c.key===k)).filter(c=>c&&!wfColHidden[c.key]);
+
+  const thead=cols.map(col=>{
+    const w=wfColWidths[col.key]||col.width;
+    const arrow=col.sortable&&ss.col===col.key?(ss.asc?'▲':'▼'):'';
+    const activeClass=ss.col===col.key?'style="color:var(--blue)"':'';
+    return `<th data-wfcol="${col.key}" data-bid="${bucketId}"
+      style="width:${w}px;min-width:${w}px;max-width:${w}px;position:relative;text-align:left;font-size:10px;font-weight:500;color:var(--tx3);padding:5px 8px;border-bottom:1px solid var(--bdr);border-right:1px solid var(--bdr);white-space:nowrap;cursor:pointer;user-select:none;text-transform:uppercase;letter-spacing:.3px;background:var(--surf2)"
+      onclick="wfSort('${bucketId}','${col.key}')"
+      draggable="true"
+      ondragstart="wfColDragStart(event,'${col.key}')"
+      ondragover="event.preventDefault();this.style.background='var(--bbg)'"
+      ondragleave="this.style.background='var(--surf2)'"
+      ondrop="wfColDrop(event,'${col.key}',this)">
+      <span ${activeClass}>${col.label} ${arrow}</span>
+      <div style="position:absolute;right:0;top:0;bottom:0;width:5px;cursor:col-resize;z-index:2"
+        onmousedown="wfResizeStart(event,'${col.key}',${w})"></div>
+    </th>`;
+  }).join('');
+
+  const tbody=sorted.map(p=>{
+    const derived=deriveFields(p);
+    const cells=cols.map(col=>{
+      const w=wfColWidths[col.key]||col.width;
+      const style=`width:${w}px;min-width:${w}px;max-width:${w}px`;
+      const val=col.key==='_bucket'?'__wfbucket__':p[col.key];
+      const html=fmtWFCell(col,val,derived,p);
+      const align=['money','pl-money','pl-pct','pop','num1','num2','price2','price4','qty','dte','days'].includes(col.fmt)?'text-align:right':'';
+      return `<td style="${style};${align};padding:6px 8px;border-bottom:1px solid var(--bdr);border-right:1px solid var(--bdr);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;vertical-align:middle;font-size:12px">${html}</td>`;
+    }).join('');
+    return `<tr style="cursor:default" onmouseover="this.style.background='#FAFAF7'" onmouseout="this.style.background=''">${cells}</tr>`;
+  }).join('');
+
+  return `<div style="overflow-x:auto">
+    <table style="border-collapse:collapse;width:max-content;min-width:100%;table-layout:fixed">
+      <thead><tr>${thead}</tr></thead>
+      <tbody>${tbody}</tbody>
+    </table>
+  </div>`;
+}
+
+function fmtWFCell(col, val, derived, pos){
+  if(val===undefined||val===null||val==='--'||val===''){
+    return '<span style="color:var(--tx3)">—</span>';
+  }
+  if(col.key==='_bucket'||col.fmt==='wf-bucket'){
+    const bucket=pos?getBucketForPosition(pos):null;
+    if(!bucket) return '<span style="color:var(--tx3)">—</span>';
+    return `<span style="font-size:10px;padding:2px 7px;border-radius:8px;font-weight:500;white-space:nowrap;background:${hexToRgba(bucket.color,0.13)};color:${bucket.color};border:1px solid ${hexToRgba(bucket.color,0.28)}">${bucket.name}</span>`;
+  }
+  if(col.fmt==='wf-symbol'){
+    const isFut=String(val).startsWith('./');
+    const sym=val.split(' ')[0].replace('./','');
+    const futTag=isFut?'<span style="font-size:9px;background:var(--pbg);color:var(--pt);padding:1px 4px;border-radius:6px;margin-left:3px;font-weight:500">FUT</span>':'';
+    return `<strong style="font-size:11px">${sym}</strong>${futTag}`;
+  }
+  if(col.fmt==='wf-cp'){
+    return val==='Put'?'<span class="badge br">P</span>':'<span class="badge bg">C</span>';
+  }
+  // Reuse main fmtCell for all other formats
+  return fmtCell(col,val,derived,pos);
+}
+
+function wfSort(bucketId, colKey){
+  const ss=wfSortState[bucketId]||{col:'',asc:true};
+  wfSortState[bucketId]={col:colKey, asc:ss.col===colKey?!ss.asc:true};
+  renderWorkflow();
+}
+
+let wfDragColKey=null;
+function wfColDragStart(event, colKey){
+  wfDragColKey=colKey;
+  event.dataTransfer.effectAllowed='move';
+}
+function wfColDrop(event, toKey, th){
+  event.preventDefault();
+  th.style.background='var(--surf2)';
+  if(!wfDragColKey||wfDragColKey===toKey) return;
+  const fi=wfColOrder.indexOf(wfDragColKey);
+  const ti=wfColOrder.indexOf(toKey);
+  if(fi<0||ti<0) return;
+  wfColOrder.splice(fi,1);
+  wfColOrder.splice(ti,0,wfDragColKey);
+  wfDragColKey=null;
+  saveToGH();
+  renderWorkflow();
+}
+
+function wfResizeStart(event, colKey, startW){
+  event.stopPropagation();
+  event.preventDefault();
+  const startX=event.clientX;
+  const onMove=e=>{
+    const newW=Math.max(40, startW+e.clientX-startX);
+    wfColWidths[colKey]=newW;
+    // Update all matching th/td in all wf tables
+    document.querySelectorAll(`[data-wfcol="${colKey}"]`).forEach(el=>{
+      el.style.width=newW+'px';el.style.minWidth=newW+'px';el.style.maxWidth=newW+'px';
+    });
+  };
+  const onUp=()=>{
+    document.removeEventListener('mousemove',onMove);
+    document.removeEventListener('mouseup',onUp);
+    saveToGH();
+  };
+  document.addEventListener('mousemove',onMove);
+  document.addEventListener('mouseup',onUp);
+}
+
 
 function toggleWFBucket(hdr){
   hdr.parentElement.querySelector('.wf-bbody').classList.toggle('open');
@@ -1527,6 +1622,15 @@ function migrateBucketOrder(){
   saveToGH();
 }
 
+function resetWFCols(){
+  wfColOrder=WF_COLS.map(c=>c.key);
+  wfColWidths={};
+  wfColHidden={};
+  wfSortState={};
+  saveToGH();
+  renderWorkflow();
+}
+
 function renderAll(){renderPositions();renderWorkflow();}
 
 function exportJSON(){
@@ -1543,7 +1647,7 @@ function clearAll(){
 // ═══════════════════════════════════════════════════════════
 // COLUMN PANEL
 // ═══════════════════════════════════════════════════════════
-const ESSENTIAL_COLS = ['_cb','Symbol','Call/Put','Quantity','Strike Price','Exp Date','DTE',"D's Opn",'Trade Price','Mark','P/L Open','P/L Opn%','PoP','Underlying Last Price','_actions'];
+const ESSENTIAL_COLS = ['_cb','Symbol','_bucket','Call/Put','Quantity','Strike Price','Exp Date','DTE',"D's Opn",'Trade Price','Mark','P/L Open','P/L Opn%','PoP','β Delta','/ Delta','Underlying Last Price','_actions'];
 
 function toggleColPanel(){
   const panel = document.getElementById('col-panel');
