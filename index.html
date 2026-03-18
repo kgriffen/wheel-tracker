@@ -222,6 +222,7 @@ tr.selected td{background:#EEF5FC !important}
           <th onclick="sortBy('expDate')">Exp</th>
           <th onclick="sortBy('dte')">DTE</th>
           <th onclick="sortBy('netPremium')">Net premium</th>
+          <th onclick="sortBy('tradePrice')">Trd Prc</th>
           <th onclick="sortBy('mark')">Mark</th>
           <th onclick="sortBy('premCaptured')">% Captured</th>
           <th onclick="sortBy('annYield')">Ann. yield</th>
@@ -415,7 +416,8 @@ tr.selected td{background:#EEF5FC !important}
       <div class="fr"><label>Capital / collateral ($)</label><input id="e-cap" type="number"></div>
     </div>
     <div class="f2">
-      <div class="fr"><label>Mark price</label><input id="e-mark" type="number" step="0.01"></div>
+      <div class="fr"><label>Trade price (fill at open)</label><input id="e-trdprc" type="number" step="0.0001" placeholder="per-share fill price"></div>
+      <div class="fr"><label>Mark (current price)</label><input id="e-mark" type="number" step="0.01"></div>
       <div class="fr"><label>Underlying last price</label><input id="e-last" type="number" step="0.01"></div>
     </div>
     <div class="f2">
@@ -577,11 +579,13 @@ function calcAnnYield(prem, cap, dte) {
   return ((p/c)*(365/d)*100).toFixed(1);
 }
 
-function calcPremCaptured(openPrem, mark, qty, mult) {
-  const op=parseFloat(openPrem), m=parseFloat(mark), q=parseInt(qty)||1, mu=parseInt(mult)||100;
-  if(isNaN(op)||isNaN(m)||op<=0) return null;
-  const currentVal = m * q * mu;
-  return Math.round((1-(currentVal/op))*100);
+// tradePrice = per-share fill price at open (Tastytrade "Trade Price" column)
+// mark = current per-share market price
+// % captured = (tradePrice - mark) / tradePrice * 100
+function calcPremCaptured(tradePrice, mark) {
+  const tp=parseFloat(tradePrice), m=parseFloat(mark);
+  if(!tp||isNaN(tp)||tp<=0||m===null||isNaN(m)) return null;
+  return Math.round(((tp-m)/tp)*100);
 }
 
 function fmt$(v, sign=false) {
@@ -691,7 +695,8 @@ function handlePositions(e) {
         match.plOpen = plOpen;
         match.ivRank = ivRank;
         match.theta = theta;
-        match.premCaptured = calcPremCaptured(match.netPremium, mark, match.qty, match.multiplier||100);
+        if(tradePrice) match.tradePrice=tradePrice;
+      match.premCaptured = calcPremCaptured(match.tradePrice||tradePrice, mark);
         updated++;
       }
     }
@@ -901,7 +906,7 @@ function bootstrapFromPositions(lines, headers) {
     const callPut=(row['call/put']||'').toLowerCase().includes('put')?'Put':'Call';
     const qty=Math.abs(cleanNum(row['quantity']));
     const cost=cleanNum(row['cost']); // total premium collected (positive = credit)
-    const tradePrice=cleanNum(row['trade price']);
+    const tradePrice=Math.abs(cleanNum(row['trade price'])); // per-share fill price
     const mark=cleanNum(row['mark']);
     const lastClose=cleanNum(row['underlying last price']||row['underlying price']||'');
     const pop=cleanNum(row['pop']);
@@ -928,7 +933,7 @@ function bootstrapFromPositions(lines, headers) {
       netPremium: isShort?netPremium:-netPremium,
       capital, multiplier: mult,
       lastClose, mark, pop, plOpen, ivRank, theta,
-      premCaptured: calcPremCaptured(netPremium, mark, qty, mult),
+      tradePrice, premCaptured: calcPremCaptured(tradePrice, mark),
       annYield: calcAnnYield(isShort?netPremium:0, capital, dte),
       status: 'open',
       spreadId: null, orderId: 'bootstrap',
@@ -985,12 +990,14 @@ function handlePositions(e) {
           t.callPut===callPut&&
           (t.underlyingSym===underlyingSym||t.symbol===rawSym)
         );
+        const tradePrice=cleanNum(row['trade price']);
         if(match) {
           if(mark) match.mark=mark;
           if(lastClose) match.lastClose=lastClose;
           if(pop) match.pop=pop;
           if(plOpen!==0) match.plOpen=plOpen;
-          match.premCaptured=calcPremCaptured(match.netPremium, mark, match.qty, match.multiplier||100);
+          if(tradePrice) match.tradePrice=tradePrice;
+          match.premCaptured=calcPremCaptured(match.tradePrice||tradePrice, mark);
           updated++;
         }
       }
@@ -1096,7 +1103,7 @@ function renderTrades() {
       const legs=spreadGroups[t.spreadId]||[t];
       const netPrem=legs.reduce((s,l)=>s+(parseFloat(l.netPremium)||0),0);
       // Header row for spread group
-      html+=`<tr class="spread-group-hdr"><td colspan="19">SPREAD — Order ${t.orderId||''}  ·  Net: <strong>${fmt$(netPrem,true)}</strong></td></tr>`;
+      html+=`<tr class="spread-group-hdr"><td colspan="20">SPREAD — Order ${t.orderId||''}  ·  Net: <strong>${fmt$(netPrem,true)}</strong></td></tr>`;
       legs.forEach(leg=>{ html+=tradeRow(leg,true); });
     } else {
       html+=tradeRow(t,false);
@@ -1137,6 +1144,7 @@ function tradeRow(t, isSpreadLeg) {
     <td class="mono">${t.expDate||'—'}</td>
     <td class="mono">${dteStr}</td>
     <td class="mono" style="color:${prem>=0?'var(--green)':'var(--red)'}">${fmt$(t.netPremium)}</td>
+    <td class="mono">${t.tradePrice?'$'+parseFloat(t.tradePrice).toFixed(4).replace(/\.?0+$/,''):'—'}</td>
     <td class="mono">${t.mark?'$'+parseFloat(t.mark).toFixed(2):'—'}</td>
     <td class="mono">${capPct}</td>
     <td class="mono">${ay?ay+'%':'—'}</td>
@@ -1440,6 +1448,7 @@ function openEdit(id) {
   document.getElementById('e-odate').value = t.openDate||'';
   document.getElementById('e-prem').value = t.netPremium||'';
   document.getElementById('e-cap').value = t.capital||'';
+  document.getElementById('e-trdprc').value = t.tradePrice||'';
   document.getElementById('e-mark').value = t.mark||'';
   document.getElementById('e-last').value = t.lastClose||'';
   document.getElementById('e-pop').value = t.pop||'';
@@ -1466,6 +1475,7 @@ function saveEdit() {
   t.openDate = document.getElementById('e-odate').value||t.openDate;
   t.netPremium = parseFloat(document.getElementById('e-prem').value)||t.netPremium;
   t.capital = parseFloat(document.getElementById('e-cap').value)||(strike*100*qty);
+  t.tradePrice = parseFloat(document.getElementById('e-trdprc').value)||t.tradePrice||null;
   t.mark = parseFloat(document.getElementById('e-mark').value)||t.mark||null;
   t.lastClose = parseFloat(document.getElementById('e-last').value)||t.lastClose||null;
   t.pop = parseFloat(document.getElementById('e-pop').value)||t.pop||null;
@@ -1476,7 +1486,7 @@ function saveEdit() {
   // Recalculate derived fields
   const dte = calcDTE(t.expDate);
   t.annYield = calcAnnYield(Math.max(t.netPremium,0), t.capital, dte);
-  t.premCaptured = calcPremCaptured(t.netPremium, t.mark, t.qty, t.multiplier||100);
+  t.premCaptured = calcPremCaptured(t.tradePrice, t.mark);
   if(t.closeDate && t.closePremium) t.realizedPL = (t.netPremium||0) - t.closePremium;
   saveToGH(); closeM('edit-mo'); renderAll();
 }
