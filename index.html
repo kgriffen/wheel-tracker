@@ -245,7 +245,21 @@ input[type=checkbox]{width:13px;height:13px;cursor:pointer;accent-color:var(--tx
         <option value="ATM">ATM</option>
         <option value="OTM">OTM</option>
       </select>
-      <button class="btn btn-sm" onclick="resetColOrder()">Reset columns</button>
+      <div style="position:relative">
+        <button class="btn btn-sm" id="col-panel-btn" onclick="toggleColPanel()">⊞ Columns</button>
+        <div id="col-panel" style="display:none;position:absolute;right:0;top:calc(100% + 4px);background:var(--surf);border:1px solid var(--bdr2);border-radius:var(--rl);padding:12px;z-index:100;width:220px;box-shadow:0 4px 16px rgba(0,0,0,.1)">
+          <div style="font-size:10px;font-weight:500;color:var(--tx3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Column presets</div>
+          <div style="display:flex;gap:6px;margin-bottom:12px">
+            <button class="btn btn-sm" style="flex:1" onclick="applyPreset('essential')">Essentials</button>
+            <button class="btn btn-sm" style="flex:1" onclick="applyPreset('all')">All</button>
+          </div>
+          <div style="font-size:10px;font-weight:500;color:var(--tx3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Drag to reorder</div>
+          <div id="col-checklist" style="max-height:320px;overflow-y:auto"></div>
+          <div style="margin-top:10px;border-top:1px solid var(--bdr);padding-top:8px">
+            <button class="btn btn-sm" style="width:100%;font-size:11px" onclick="resetColOrder()">Reset all</button>
+          </div>
+        </div>
+      </div>
     </div>
     <div class="bulk-bar" id="bulk-bar">
       <span class="bulk-ct"><span id="bulk-ct">0</span> selected</span>
@@ -400,6 +414,7 @@ let positions = [];          // raw objects from CSV, all columns preserved
 let buckets = [];            // workflow bucket definitions
 let colOrder = [];           // column display order (array of col keys)
 let colWidths = {};          // { colKey: widthPx }
+let colHidden = {};           // { colKey: true } = hidden
 let selectedIdx = new Set(); // selected row indices (into filtered list)
 let ghCfg = { user:'kgriffen', repo:'wheel-tracker', token:'' };
 let ghSha = null;
@@ -507,6 +522,7 @@ async function loadFromGH(){
     positions=p.positions||[];
     buckets=p.buckets||DEFAULT_BUCKETS;
     colWidths=p.colWidths||{};
+    colHidden=p.colHidden||{};
     posImportDate=p.posImportDate||'';
     localStorage.setItem('wt_data',JSON.stringify({positions,buckets,colWidths,posImportDate}));
     showSync('ok','Synced ✓');
@@ -520,13 +536,14 @@ function loadLocal(){
     positions=d.positions||[];
     buckets=d.buckets&&d.buckets.length?d.buckets:DEFAULT_BUCKETS;
     colWidths=d.colWidths||{};
+    colHidden=d.colHidden||{};
     posImportDate=d.posImportDate||'';
   }catch(e){positions=[];buckets=DEFAULT_BUCKETS;colWidths={};}
   renderAll();
 }
 
 async function saveToGH(){
-  const data={positions,buckets,colWidths,posImportDate,updated:new Date().toISOString()};
+  const data={positions,buckets,colWidths,colHidden,posImportDate,updated:new Date().toISOString()};
   localStorage.setItem('wt_data',JSON.stringify(data));
   if(!ghCfg.token)return;
   showSync('syncing','Saving…');
@@ -861,7 +878,7 @@ function renderPosStats(list){
 function renderPosHeader(){
   const tr=document.getElementById('pos-thead-row');
   tr.innerHTML='';
-  const cols=colOrder.map(k=>ALL_COLS.find(c=>c.key===k)).filter(Boolean);
+  const cols=colOrder.map(k=>ALL_COLS.find(c=>c.key===k)).filter(Boolean).filter(c=>c.fixed||!colHidden[c.key]);
   cols.forEach((col,i)=>{
     const th=document.createElement('th');
     const w=colWidths[col.key]||col.width;
@@ -936,7 +953,7 @@ function renderPosHeader(){
 
 function renderPosBody(list){
   const tbody=document.getElementById('pos-tbody');
-  const cols=colOrder.map(k=>ALL_COLS.find(c=>c.key===k)).filter(Boolean);
+  const cols=colOrder.map(k=>ALL_COLS.find(c=>c.key===k)).filter(Boolean).filter(c=>c.fixed||!colHidden[c.key]);
   tbody.innerHTML=list.map((p,ri)=>{
     const derived=deriveFields(p);
     const sel=selectedIdx.has(ri);
@@ -958,12 +975,11 @@ function renderPosBody(list){
   }).join('');
 }
 
-function resetColOrder(){colOrder=ALL_COLS.map(c=>c.key);colWidths={};renderPositions();}
+function resetColOrder(){colOrder=ALL_COLS.map(c=>c.key);colWidths={};colHidden={};closeColPanel();renderPositions();saveToGH();}
 
 // ═══════════════════════════════════════════════════════════
 // SELECTION
 // ═══════════════════════════════════════════════════════════
-let selectedIdx=new Set();
 
 function onRowCheck(cb){
   const ri=parseInt(cb.dataset.ri);
@@ -1463,6 +1479,111 @@ function clearAll(){
   positions=[];buckets=DEFAULT_BUCKETS;colWidths={};posImportDate='';ghSha=null;
   saveToGH();renderAll();
 }
+
+// ═══════════════════════════════════════════════════════════
+// COLUMN PANEL
+// ═══════════════════════════════════════════════════════════
+const ESSENTIAL_COLS = ['_cb','Symbol','Call/Put','Quantity','Strike Price','Exp Date','DTE',"D's Opn",'Trade Price','Mark','P/L Open','P/L Opn%','PoP','Underlying Last Price','_actions'];
+
+function toggleColPanel(){
+  const panel = document.getElementById('col-panel');
+  const isOpen = panel.style.display !== 'none';
+  if(isOpen){ closeColPanel(); return; }
+  renderColChecklist();
+  panel.style.display = 'block';
+  // close on outside click
+  setTimeout(()=>{
+    document.addEventListener('click', outsideColPanel);
+  }, 10);
+}
+
+function closeColPanel(){
+  document.getElementById('col-panel').style.display='none';
+  document.removeEventListener('click', outsideColPanel);
+}
+
+function outsideColPanel(e){
+  const panel = document.getElementById('col-panel');
+  const btn = document.getElementById('col-panel-btn');
+  if(!panel.contains(e.target) && !btn.contains(e.target)){
+    closeColPanel();
+  }
+}
+
+function renderColChecklist(){
+  const list = document.getElementById('col-checklist');
+  // Show toggleable cols in current colOrder
+  const toggleable = colOrder.map(k=>ALL_COLS.find(c=>c.key===k)).filter(c=>c&&!c.fixed);
+  list.innerHTML = toggleable.map(col=>{
+    const hidden = colHidden[col.key];
+    return `<div class="col-check-row" draggable="true" data-col="${col.key}"
+      ondragstart="colDragStart(event,this)"
+      ondragover="colDragOver(event,this)"
+      ondragleave="colDragLeave(this)"
+      ondrop="colDrop(event,this)"
+      style="display:flex;align-items:center;gap:7px;padding:4px 3px;border-radius:5px;cursor:grab">
+      <span style="color:var(--tx3);font-size:12px;cursor:grab">⠿</span>
+      <input type="checkbox" ${hidden?'':'checked'} style="width:14px;height:14px;accent-color:var(--blue);cursor:pointer"
+        onchange="toggleColVisibility('${col.key}',this.checked)">
+      <span style="font-size:12px;flex:1">${col.label||col.key}</span>
+    </div>`;
+  }).join('');
+}
+
+function toggleColVisibility(key, visible){
+  if(visible) delete colHidden[key];
+  else colHidden[key] = true;
+  renderPositions();
+  saveToGH();
+}
+
+function applyPreset(preset){
+  if(preset==='essential'){
+    // Hide all non-essential
+    ALL_COLS.forEach(c=>{
+      if(!c.fixed && !ESSENTIAL_COLS.includes(c.key)) colHidden[c.key]=true;
+      else delete colHidden[c.key];
+    });
+  } else {
+    colHidden={};
+  }
+  renderColChecklist();
+  renderPositions();
+  saveToGH();
+}
+
+// Drag to reorder within the column checklist
+let colDragKey = null;
+function colDragStart(e, el){
+  colDragKey = el.dataset.col;
+  el.style.opacity = '0.4';
+  e.dataTransfer.effectAllowed = 'move';
+}
+function colDragOver(e, el){
+  e.preventDefault();
+  el.style.background = 'var(--bbg)';
+}
+function colDragLeave(el){ el.style.background = ''; }
+function colDrop(e, el){
+  e.preventDefault();
+  el.style.background = '';
+  const toKey = el.dataset.col;
+  if(!colDragKey || colDragKey===toKey) return;
+  const fi = colOrder.indexOf(colDragKey);
+  const ti = colOrder.indexOf(toKey);
+  if(fi<0||ti<0) return;
+  colOrder.splice(fi,1);
+  colOrder.splice(ti,0,colDragKey);
+  colDragKey=null;
+  renderColChecklist();
+  renderPositions();
+  saveToGH();
+}
+// reset opacity on dragend
+document.addEventListener('dragend', e=>{
+  if(e.target.classList?.contains('col-check-row')) e.target.style.opacity='';
+});
+
 </script>
 </body>
 </html>
