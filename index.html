@@ -845,7 +845,7 @@ function fmtCell(col,val,derived,pos){
       if(val==='__pae_pct__'){
         if(derived?.paePct===null||derived?.paePct===undefined) return '<span style="color:var(--tx3)">—</span>';
         const n=derived.paePct;
-        const cls=n>=100?'cg':n>=50?'ca':'cr';
+        const cls=n>=100?'cg':n>=1?'ca':'cr';
         return `<span class="mono ${cls}" style="font-weight:500">${n.toFixed(1)}%</span>`;
       }
       return '<span style="color:var(--tx3)">—</span>';
