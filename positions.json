@@ -1965,6 +1965,18 @@
       ]
     },
     {
+      "id": "b-urgent",
+      "name": "Urgent",
+      "color": "#D85A30",
+      "conditions": [
+        {
+          "field": "pl_pct",
+          "op": ">",
+          "value": "200"
+        }
+      ]
+    },
+    {
       "id": "b-working",
       "name": "Working",
       "color": "#185FA5",
@@ -1992,18 +2004,6 @@
           "value": "65"
         }
       ]
-    },
-    {
-      "id": "b-urgent",
-      "name": "Urgent",
-      "color": "#D85A30",
-      "conditions": [
-        {
-          "field": "pl_pct",
-          "op": ">",
-          "value": "200"
-        }
-      ]
     }
   ],
   "colWidths": {
@@ -2011,5 +2011,5 @@
   },
   "colHidden": {},
   "posImportDate": "3/18/2026, 7:34:11 AM",
-  "updated": "2026-03-18T14:44:22.374Z"
+  "updated": "2026-03-18T14:44:35.711Z"
 }
