@@ -149,6 +149,17 @@ tbody tr:hover td{background:var(--surface2)}
 .irow input{flex:1}
 /* FUTURES badge */
 .fut-badge{font-size:9px;background:var(--purple-bg);color:var(--purple-t);padding:1px 5px;border-radius:8px;margin-left:4px;vertical-align:middle;font-weight:500}
+/* CHECKBOX */
+input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:var(--text);border-radius:3px;flex-shrink:0}
+td.cb-cell,th.cb-cell{padding:8px 8px 8px 14px;width:32px}
+tr.selected td{background:#EEF5FC !important}
+/* BULK ACTION BAR */
+.bulk-bar{display:none;align-items:center;gap:10px;padding:9px 14px;background:var(--blue-bg);border-bottom:1px solid rgba(24,95,165,.18);font-size:13px}
+.bulk-bar.show{display:flex}
+.bulk-count{font-weight:500;color:var(--blue-t)}
+/* EDIT BUTTON */
+.btn-edit{padding:3px 8px;font-size:11px;border:1px solid var(--border2);border-radius:var(--r);cursor:pointer;background:none;color:var(--text2);transition:all .12s}
+.btn-edit:hover{background:var(--surface2);color:var(--text)}
 </style>
 </head>
 <body>
@@ -194,9 +205,15 @@ tbody tr:hover td{background:var(--surface2)}
         <option value="futures">Futures options</option>
       </select>
     </div>
+    <div class="bulk-bar" id="bulk-bar">
+      <span class="bulk-count"><span id="bulk-count">0</span> selected</span>
+      <button class="btn btn-sm" style="color:var(--red-t);border-color:var(--red)" onclick="deleteSelected()">Delete selected</button>
+      <button class="btn btn-sm" onclick="clearSelection()">Clear selection</button>
+    </div>
     <div class="tw">
       <table>
         <thead><tr>
+          <th class="cb-cell" onclick="toggleSelectAll(this)" style="cursor:pointer" title="Select all"><input type="checkbox" id="select-all" onclick="event.stopPropagation();toggleSelectAll(this)"></th>
           <th onclick="sortBy('symbol')">Symbol</th>
           <th onclick="sortBy('instType')">Type</th>
           <th onclick="sortBy('callPut')">C/P</th>
@@ -360,6 +377,61 @@ tbody tr:hover td{background:var(--surface2)}
     <button class="btn btn-p" style="width:100%" onclick="connectTT()">Sign in and fetch positions</button>
     <div id="tt-res" style="font-size:12px;margin-top:10px;display:none"></div>
     <div class="mf"><button class="btn" onclick="closeM('conn-mo')">Close</button></div>
+  </div>
+</div>
+
+<!-- ═══ EDIT TRADE MODAL ═══ -->
+<div class="mo" id="edit-mo">
+  <div class="modal">
+    <div class="mtitle">Edit trade</div>
+    <input type="hidden" id="e-id">
+    <div class="f2">
+      <div class="fr"><label>Underlying symbol</label><input id="e-sym" style="text-transform:uppercase"></div>
+      <div class="fr"><label>Instrument type</label><select id="e-inst"><option value="equity">Equity Option</option><option value="futures">Futures Option</option></select></div>
+    </div>
+    <div class="f2">
+      <div class="fr"><label>Call / Put</label><select id="e-cp"><option>Put</option><option>Call</option></select></div>
+      <div class="fr"><label>Status</label>
+        <select id="e-status">
+          <option value="open">Open</option>
+          <option value="spread_short">Spread short</option>
+          <option value="spread_long">Spread long</option>
+          <option value="rolled">Rolled</option>
+          <option value="closed">Closed</option>
+          <option value="assigned">Assigned</option>
+        </select>
+      </div>
+    </div>
+    <div class="f2">
+      <div class="fr"><label>Strike</label><input id="e-strike" type="number" step="0.5"></div>
+      <div class="fr"><label>Contracts</label><input id="e-qty" type="number" min="1"></div>
+    </div>
+    <div class="f2">
+      <div class="fr"><label>Expiration</label><input id="e-exp" type="date"></div>
+      <div class="fr"><label>Open date</label><input id="e-odate" type="date"></div>
+    </div>
+    <div class="f2">
+      <div class="fr"><label>Net premium ($)</label><input id="e-prem" type="number" step="0.01"></div>
+      <div class="fr"><label>Capital / collateral ($)</label><input id="e-cap" type="number"></div>
+    </div>
+    <div class="f2">
+      <div class="fr"><label>Mark price</label><input id="e-mark" type="number" step="0.01"></div>
+      <div class="fr"><label>Underlying last price</label><input id="e-last" type="number" step="0.01"></div>
+    </div>
+    <div class="f2">
+      <div class="fr"><label>PoP %</label><input id="e-pop" type="number" step="1"></div>
+      <div class="fr"><label>P/L Open ($)</label><input id="e-plopen" type="number" step="0.01"></div>
+    </div>
+    <div class="f2">
+      <div class="fr"><label>Close date</label><input id="e-cdate" type="date"></div>
+      <div class="fr"><label>Close premium ($)</label><input id="e-cprem" type="number" step="0.01"></div>
+    </div>
+    <div class="fr"><label>Notes</label><input id="e-notes"></div>
+    <div class="mf">
+      <button class="btn" style="color:var(--red-t);border-color:var(--red);margin-right:auto" onclick="deleteFromEdit()">Delete</button>
+      <button class="btn" onclick="closeM('edit-mo')">Cancel</button>
+      <button class="btn btn-p" onclick="saveEdit()">Save changes</button>
+    </div>
   </div>
 </div>
 
@@ -1024,7 +1096,7 @@ function renderTrades() {
       const legs=spreadGroups[t.spreadId]||[t];
       const netPrem=legs.reduce((s,l)=>s+(parseFloat(l.netPremium)||0),0);
       // Header row for spread group
-      html+=`<tr class="spread-group-hdr"><td colspan="17">SPREAD — Order ${t.orderId||''}  ·  Net: <strong>${fmt$(netPrem,true)}</strong></td></tr>`;
+      html+=`<tr class="spread-group-hdr"><td colspan="19">SPREAD — Order ${t.orderId||''}  ·  Net: <strong>${fmt$(netPrem,true)}</strong></td></tr>`;
       legs.forEach(leg=>{ html+=tradeRow(leg,true); });
     } else {
       html+=tradeRow(t,false);
@@ -1032,6 +1104,16 @@ function renderTrades() {
   });
 
   tbody.innerHTML=html;
+
+  // Restore checkbox states for already-selected rows
+  document.querySelectorAll('.row-cb').forEach(cb => {
+    const id = parseFloat(cb.dataset.id);
+    if(selectedIds.has(id)) {
+      cb.checked = true;
+      cb.closest('tr')?.classList.add('selected');
+    }
+  });
+  updateBulkBar();
 }
 
 function tradeRow(t, isSpreadLeg) {
@@ -1044,7 +1126,9 @@ function tradeRow(t, isSpreadLeg) {
   const capPct=t.premCaptured!==null&&t.premCaptured!==undefined?`${t.premCaptured}%`:'—';
   const sym=`<strong>${t.underlyingSym||t.symbol}</strong>${t.instType==='futures'?'<span class="fut-badge">FUT</span>':''}${isSpreadLeg?'<span class="spread-label">leg</span>':''}`;
   const plStr=t.plOpen!==null&&t.plOpen!==undefined?`<span class="${parseFloat(t.plOpen)>=0?'cg':'cr'}">${fmt$(t.plOpen,true)}</span>`:'—';
-  return `<tr class="${isSpreadLeg?'spread-group':''}">
+  const tid=String(t.id).replace('.','_');
+  return `<tr class="${isSpreadLeg?'spread-group':''}" id="row-${tid}" data-id="${t.id}">
+    <td class="cb-cell"><input type="checkbox" class="row-cb" data-id="${t.id}" onchange="onRowCheck(this)"></td>
     <td>${sym}</td>
     <td><span class="badge ${t.instType==='futures'?'bp':'bgy'}">${t.instType==='futures'?'Futures':'Equity'}</span></td>
     <td>${t.callPut||'—'}</td>
@@ -1061,7 +1145,10 @@ function tradeRow(t, isSpreadLeg) {
     <td>${itmBadge(itm)}</td>
     <td>${plStr}</td>
     <td>${statusBadge(t.status)}</td>
-    <td><button class="btn btn-sm" onclick="deleteTrade(${t.id})" style="color:var(--text3)">✕</button></td>
+    <td style="display:flex;gap:4px;align-items:center">
+      <button class="btn-edit" onclick="openEdit(${t.id})">Edit</button>
+      <button class="btn btn-sm" onclick="deleteTrade(${t.id})" style="color:var(--text3)">✕</button>
+    </td>
   </tr>`;
 }
 
@@ -1272,7 +1359,134 @@ function saveManualTrade() {
 function deleteTrade(id) {
   if(!confirm('Delete this trade?')) return;
   trades=trades.filter(t=>t.id!==id);
+  selectedIds.delete(id);
   saveToGH(); renderAll();
+}
+
+// ═══════════════════════════════════════════════
+// SELECTION & BULK DELETE
+// ═══════════════════════════════════════════════
+let selectedIds = new Set();
+
+function onRowCheck(cb) {
+  const id = parseFloat(cb.dataset.id);
+  if(cb.checked) selectedIds.add(id);
+  else selectedIds.delete(id);
+  updateBulkBar();
+  const row = cb.closest('tr');
+  if(row) row.classList.toggle('selected', cb.checked);
+}
+
+function toggleSelectAll(el) {
+  // el may be the th or the checkbox itself
+  const masterCb = document.getElementById('select-all');
+  const checked = (el === masterCb) ? masterCb.checked : !masterCb.checked;
+  masterCb.checked = checked;
+  document.querySelectorAll('.row-cb').forEach(cb => {
+    cb.checked = checked;
+    const id = parseFloat(cb.dataset.id);
+    if(checked) selectedIds.add(id);
+    else selectedIds.delete(id);
+    const row = cb.closest('tr');
+    if(row) row.classList.toggle('selected', checked);
+  });
+  updateBulkBar();
+}
+
+function updateBulkBar() {
+  const bar = document.getElementById('bulk-bar');
+  const cnt = document.getElementById('bulk-count');
+  cnt.textContent = selectedIds.size;
+  bar.classList.toggle('show', selectedIds.size > 0);
+  // Sync master checkbox state
+  const allCbs = document.querySelectorAll('.row-cb');
+  const masterCb = document.getElementById('select-all');
+  if(masterCb) {
+    masterCb.checked = allCbs.length > 0 && selectedIds.size === allCbs.length;
+    masterCb.indeterminate = selectedIds.size > 0 && selectedIds.size < allCbs.length;
+  }
+}
+
+function clearSelection() {
+  selectedIds.clear();
+  document.querySelectorAll('.row-cb').forEach(cb => { cb.checked=false; cb.closest('tr')?.classList.remove('selected'); });
+  const mc = document.getElementById('select-all');
+  if(mc) { mc.checked=false; mc.indeterminate=false; }
+  updateBulkBar();
+}
+
+function deleteSelected() {
+  if(!selectedIds.size) return;
+  if(!confirm(`Delete ${selectedIds.size} selected trade${selectedIds.size!==1?'s':''}? This cannot be undone.`)) return;
+  trades = trades.filter(t => !selectedIds.has(t.id));
+  selectedIds.clear();
+  saveToGH(); renderAll();
+}
+
+// ═══════════════════════════════════════════════
+// EDIT TRADE
+// ═══════════════════════════════════════════════
+function openEdit(id) {
+  const t = trades.find(t=>t.id===id);
+  if(!t) return;
+  document.getElementById('e-id').value = id;
+  document.getElementById('e-sym').value = t.underlyingSym||t.symbol||'';
+  document.getElementById('e-inst').value = t.instType||'equity';
+  document.getElementById('e-cp').value = t.callPut||'Put';
+  document.getElementById('e-status').value = t.status||'open';
+  document.getElementById('e-strike').value = t.strike||'';
+  document.getElementById('e-qty').value = t.qty||1;
+  document.getElementById('e-exp').value = t.expDate||'';
+  document.getElementById('e-odate').value = t.openDate||'';
+  document.getElementById('e-prem').value = t.netPremium||'';
+  document.getElementById('e-cap').value = t.capital||'';
+  document.getElementById('e-mark').value = t.mark||'';
+  document.getElementById('e-last').value = t.lastClose||'';
+  document.getElementById('e-pop').value = t.pop||'';
+  document.getElementById('e-plopen').value = t.plOpen||'';
+  document.getElementById('e-cdate').value = t.closeDate||'';
+  document.getElementById('e-cprem').value = t.closePremium||'';
+  document.getElementById('e-notes').value = t.notes||'';
+  openM('edit-mo');
+}
+
+function saveEdit() {
+  const id = parseFloat(document.getElementById('e-id').value);
+  const t = trades.find(t=>t.id===id);
+  if(!t) return;
+  const strike = parseFloat(document.getElementById('e-strike').value)||t.strike;
+  const qty = parseInt(document.getElementById('e-qty').value)||t.qty;
+  t.underlyingSym = document.getElementById('e-sym').value.trim().toUpperCase()||t.underlyingSym;
+  t.instType = document.getElementById('e-inst').value;
+  t.callPut = document.getElementById('e-cp').value;
+  t.status = document.getElementById('e-status').value;
+  t.strike = strike;
+  t.qty = qty;
+  t.expDate = document.getElementById('e-exp').value||t.expDate;
+  t.openDate = document.getElementById('e-odate').value||t.openDate;
+  t.netPremium = parseFloat(document.getElementById('e-prem').value)||t.netPremium;
+  t.capital = parseFloat(document.getElementById('e-cap').value)||(strike*100*qty);
+  t.mark = parseFloat(document.getElementById('e-mark').value)||t.mark||null;
+  t.lastClose = parseFloat(document.getElementById('e-last').value)||t.lastClose||null;
+  t.pop = parseFloat(document.getElementById('e-pop').value)||t.pop||null;
+  t.plOpen = parseFloat(document.getElementById('e-plopen').value)||t.plOpen||null;
+  t.closeDate = document.getElementById('e-cdate').value||t.closeDate||null;
+  t.closePremium = parseFloat(document.getElementById('e-cprem').value)||t.closePremium||null;
+  t.notes = document.getElementById('e-notes').value;
+  // Recalculate derived fields
+  const dte = calcDTE(t.expDate);
+  t.annYield = calcAnnYield(Math.max(t.netPremium,0), t.capital, dte);
+  t.premCaptured = calcPremCaptured(t.netPremium, t.mark, t.qty, t.multiplier||100);
+  if(t.closeDate && t.closePremium) t.realizedPL = (t.netPremium||0) - t.closePremium;
+  saveToGH(); closeM('edit-mo'); renderAll();
+}
+
+function deleteFromEdit() {
+  const id = parseFloat(document.getElementById('e-id').value);
+  if(!confirm('Delete this trade?')) return;
+  trades = trades.filter(t=>t.id!==id);
+  selectedIds.delete(id);
+  saveToGH(); closeM('edit-mo'); renderAll();
 }
 
 // ═══════════════════════════════════════════════
