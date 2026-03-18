@@ -480,6 +480,8 @@ const ALL_COLS = [
   {key:'Ext',       label:'Ext Val',   width:75,  sortable:true,  fmt:'money'},
   {key:'P/L Open',  label:'P/L $',     width:75,  sortable:true,  fmt:'pl-money'},
   {key:'P/L Opn%',  label:'P/L %',     width:60,  sortable:true,  fmt:'pl-pct'},
+  {key:'_pae',      label:'PAE $',      width:75,  sortable:true,  fmt:'pae-money'},
+  {key:'_pae_pct',  label:'PAE %',      width:58,  sortable:true,  fmt:'pae-pct'},
   {key:'P/L Day',   label:'P/L Day',   width:65,  sortable:true,  fmt:'pl-money'},
   {key:'PoP',       label:'PoP',       width:50,  sortable:true,  fmt:'pop'},
   {key:'IV Rank',   label:'IV Rank',   width:55,  sortable:true,  fmt:'num1'},
@@ -664,7 +666,16 @@ function deriveFields(p){
     earlyProfit=vel>maxVel;
   }
 
-  return {itmOtm,strikeDist,earlyProfit,
+  // Profit At Expiration — assumes underlying holds current price to expiry
+  let pae=null, paePct=null;
+  if((p['Type']||'')!=='FUTURES_OPTION' && qty!==null && qty<0 && strike!==null && last!==null && last>0 && cost!==null && cost>0){
+    const cp2=p['Call/Put']||'';
+    const intrinsic=cp2==='Put'?Math.max(0,strike-last):Math.max(0,last-strike);
+    pae=Math.round((cost-(intrinsic*Math.abs(qty)*100))*100)/100;
+    paePct=Math.round((pae/cost)*1000)/10;
+  }
+
+  return {itmOtm,strikeDist,earlyProfit,pae,paePct,
     _dte:dte,_daysOpn:daysOpn,_plOpen:plOpen,_plPct:plPct,_cost:cost,_pop:pop,_qty:qty,_strike:strike,_last:last};
 }
 
@@ -818,6 +829,25 @@ function fmtCell(col,val,derived,pos){
       if(!bucket) return '<span style="color:var(--tx3);font-size:11px">—</span>';
       return `<span style="font-size:10px;padding:2px 7px;border-radius:8px;font-weight:500;white-space:nowrap;background:${hexToRgba(bucket.color,0.13)};color:${bucket.color};border:1px solid ${hexToRgba(bucket.color,0.28)}">${bucket.name}</span>`;
     }
+    case 'pae-money':{
+      if(val==='__pae__'){
+        if(derived?.pae===null||derived?.pae===undefined) return '<span style="color:var(--tx3)">—</span>';
+        const n=derived.pae;
+        const cls=n>=0?'cg':'cr';
+        const abs=Math.abs(n).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+        return `<span class="mono ${cls}">${n>=0?'+$':'-$'}${abs}</span>`;
+      }
+      return '<span style="color:var(--tx3)">—</span>';
+    }
+    case 'pae-pct':{
+      if(val==='__pae_pct__'){
+        if(derived?.paePct===null||derived?.paePct===undefined) return '<span style="color:var(--tx3)">—</span>';
+        const n=derived.paePct;
+        const cls=n>=100?'cg':n>=50?'ca':'cr';
+        return `<span class="mono ${cls}" style="font-weight:500">${n.toFixed(1)}%</span>`;
+      }
+      return '<span style="color:var(--tx3)">—</span>';
+    }
     default:
       return `<span style="font-size:12px">${val}</span>`;
   }
@@ -852,6 +882,10 @@ function getFilteredPositions(){
 }
 
 function sortVal(p,colKey){
+  if(colKey==='_pae'||colKey==='_pae_pct'){
+    const d=deriveFields(p);
+    return colKey==='_pae'?d.pae:d.paePct;
+  }
   if(colKey==='_bucket'){
     const b=getBucketForPosition(p);
     if(!b) return 'zzz'; // uncategorized sorts last
@@ -995,7 +1029,10 @@ function renderPosBody(list){
       if(col.key==='_actions'){
         return `<td data-col="_actions" style="${style};text-align:center"><button class="btn btn-sm" style="padding:2px 7px;font-size:11px" onclick="openEdit(${ri})">Edit</button></td>`;
       }
-      const val=col.key==='_bucket'?'__bucket__':p[col.key];
+      const val=col.key==='_bucket'?'__bucket__':
+                col.key==='_pae'?'__pae__':
+                col.key==='_pae_pct'?'__pae_pct__':
+                p[col.key];
       const html=fmtCell(col,val,derived,p);
       const align=['money','pl-money','pl-pct','pop','num1','num2','num3','pct','pct-chg','price2','price4','qty','dte','days'].includes(col.fmt)?'text-align:right':'';
       return `<td data-col="${col.key}" style="${style};${align}" title="${String(val||'').replace(/"/g,'&quot;')}">${html}</td>`;
@@ -1127,6 +1164,8 @@ const COND_FIELDS=[
   {value:'cp',          label:'Call/Put',             type:'select', ops:['=','!='], choices:['Put','Call']},
   {value:'type',        label:'Instrument Type',     type:'select', ops:['=','!='], choices:['OPTION','FUTURES_OPTION']},
   {value:'early_profit',label:'Early Profit Rule',   type:'select', ops:['='], choices:['true']},
+  {value:'pae',         label:'PAE $ (Profit at Expiration)', type:'number', ops:['>=','<=','>','<','=']},
+  {value:'pae_pct',     label:'PAE % (of premium)',           type:'number', ops:['>=','<=','>','<','=']},
 ];
 
 
@@ -1163,6 +1202,8 @@ function evalCondition(p,cond){
     case 'cp':        actual=p['Call/Put']||''; break;
     case 'type':      actual=p['Type']||''; break;
     case 'early_profit': actual=derived.earlyProfit?'true':'false'; break;
+    case 'pae':     actual=derived.pae; break;
+    case 'pae_pct': actual=derived.paePct; break;
     case 'itm_otm':{
       const itmOtm=derived.itmOtm;
       if(value==='ATM+ITM') actual=(itmOtm==='ATM'||itmOtm==='ITM')?value:itmOtm;
@@ -1308,6 +1349,8 @@ const WF_COLS = [
   {key:'Mark',              label:'Mark',       width:65,  sortable:true,  fmt:'price4'},
   {key:'P/L Open',          label:'P/L $',      width:72,  sortable:true,  fmt:'pl-money'},
   {key:'P/L Opn%',          label:'P/L %',      width:60,  sortable:true,  fmt:'pl-pct'},
+  {key:'_pae',              label:'PAE $',      width:75,  sortable:true,  fmt:'pae-money'},
+  {key:'_pae_pct',          label:'PAE %',      width:58,  sortable:true,  fmt:'pae-pct'},
   {key:'P/L Day',           label:'P/L Day',    width:65,  sortable:true,  fmt:'pl-money'},
   {key:'PoP',               label:'PoP',        width:50,  sortable:true,  fmt:'pop'},
   {key:'IV Rank',           label:'IVR',        width:44,  sortable:true,  fmt:'num1'},
@@ -1320,6 +1363,10 @@ const WF_COLS = [
 ];
 
 function wfSortVal(p, colKey){
+  if(colKey==='_pae'||colKey==='_pae_pct'){
+    const d=deriveFields(p);
+    return colKey==='_pae'?d.pae:d.paePct;
+  }
   if(colKey==='_bucket'){
     const b=getBucketForPosition(p);
     if(!b) return 'zzz';
@@ -1367,7 +1414,10 @@ function renderWFTable(list, bucketId){
     const cells=cols.map(col=>{
       const w=wfColWidths[col.key]||col.width;
       const style=`width:${w}px;min-width:${w}px;max-width:${w}px`;
-      const val=col.key==='_bucket'?'__wfbucket__':p[col.key];
+      const val=col.key==='_bucket'?'__wfbucket__':
+                col.key==='_pae'?'__pae__':
+                col.key==='_pae_pct'?'__pae_pct__':
+                p[col.key];
       const html=fmtWFCell(col,val,derived,p);
       const align=['money','pl-money','pl-pct','pop','num1','num2','price2','price4','qty','dte','days'].includes(col.fmt)?'text-align:right':'';
       return `<td style="${style};${align};padding:6px 8px;border-bottom:1px solid var(--bdr);border-right:1px solid var(--bdr);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;vertical-align:middle;font-size:12px">${html}</td>`;
@@ -1647,7 +1697,7 @@ function clearAll(){
 // ═══════════════════════════════════════════════════════════
 // COLUMN PANEL
 // ═══════════════════════════════════════════════════════════
-const ESSENTIAL_COLS = ['_cb','Symbol','_bucket','Call/Put','Quantity','Strike Price','Exp Date','DTE',"D's Opn",'Trade Price','Mark','P/L Open','P/L Opn%','PoP','β Delta','/ Delta','Underlying Last Price','_actions'];
+const ESSENTIAL_COLS = ['_cb','Symbol','_bucket','Call/Put','Quantity','Strike Price','Exp Date','DTE',"D's Opn",'Trade Price','Mark','P/L Open','P/L Opn%','_pae','_pae_pct','PoP','β Delta','/ Delta','Underlying Last Price','_actions'];
 
 function toggleColPanel(){
   const panel = document.getElementById('col-panel');
