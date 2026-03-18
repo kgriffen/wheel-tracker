@@ -1948,9 +1948,9 @@
       "color": "#EF9F27",
       "conditions": [
         {
-          "field": "pop",
-          "op": "<",
-          "value": "65"
+          "field": "itm_otm",
+          "op": "=",
+          "value": "ATM+ITM"
         }
       ]
     },
@@ -1979,5 +1979,5 @@
     "P/L YTD": true
   },
   "posImportDate": "3/18/2026, 10:47:53 AM",
-  "updated": "2026-03-18T17:51:49.463Z"
+  "updated": "2026-03-18T17:52:57.055Z"
 }
