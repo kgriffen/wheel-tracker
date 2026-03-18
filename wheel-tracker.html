@@ -1,0 +1,1189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wheel Tracker — Karn</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;1,9..40,300&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #F7F6F2;
+    --surface: #FFFFFF;
+    --surface2: #F0EFE9;
+    --border: rgba(0,0,0,0.08);
+    --border-med: rgba(0,0,0,0.14);
+    --text: #1A1917;
+    --text2: #6B6A65;
+    --text3: #9E9D98;
+    --green: #1D9E75;
+    --green-bg: #EAF5EF;
+    --green-text: #0F6E56;
+    --red: #D85A30;
+    --red-bg: #FDF0EB;
+    --red-text: #993C1D;
+    --amber: #BA7517;
+    --amber-bg: #FDF5E6;
+    --amber-text: #854F0B;
+    --blue: #185FA5;
+    --blue-bg: #EAF1FB;
+    --blue-text: #0C447C;
+    --accent: #1A1917;
+    --radius: 8px;
+    --radius-lg: 12px;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { font-size: 14px; }
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+  }
+  /* TOPBAR */
+  .topbar {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    height: 52px;
+    display: flex;
+    align-items: center;
+    padding: 0 24px;
+    gap: 0;
+    position: sticky;
+    top: 0;
+    z-index: 50;
+  }
+  .logo {
+    font-size: 13px;
+    font-weight: 500;
+    letter-spacing: -0.01em;
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-right: 32px;
+    white-space: nowrap;
+  }
+  .logo-icon {
+    width: 24px; height: 24px;
+    background: var(--accent);
+    border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .logo-icon svg { width: 13px; height: 13px; stroke: #fff; stroke-width: 2; fill: none; }
+  nav { display: flex; gap: 2px; flex: 1; }
+  .nav-btn {
+    padding: 6px 14px;
+    font-size: 13px;
+    font-family: 'DM Sans', sans-serif;
+    color: var(--text2);
+    background: none;
+    border: none;
+    border-radius: var(--radius);
+    cursor: pointer;
+    transition: all .15s;
+    font-weight: 400;
+  }
+  .nav-btn:hover { background: var(--surface2); color: var(--text); }
+  .nav-btn.active { background: var(--surface2); color: var(--text); font-weight: 500; }
+  .topbar-right { display: flex; align-items: center; gap: 8px; }
+  /* BUTTONS */
+  .btn {
+    padding: 7px 14px;
+    font-size: 13px;
+    font-family: 'DM Sans', sans-serif;
+    border: 1px solid var(--border-med);
+    border-radius: var(--radius);
+    cursor: pointer;
+    background: var(--surface);
+    color: var(--text);
+    transition: all .15s;
+    white-space: nowrap;
+    font-weight: 400;
+  }
+  .btn:hover { background: var(--surface2); }
+  .btn:active { transform: scale(.98); }
+  .btn-primary {
+    background: var(--accent);
+    color: #fff;
+    border-color: var(--accent);
+  }
+  .btn-primary:hover { opacity: .88; background: var(--accent); }
+  .btn-sm { padding: 4px 10px; font-size: 12px; }
+  .btn-connected { border-color: var(--green); color: var(--green-text); background: var(--green-bg); }
+  /* LAYOUT */
+  .page { display: none; padding: 28px 24px; max-width: 1400px; margin: 0 auto; }
+  .page.active { display: block; }
+  .page-header { margin-bottom: 20px; }
+  .page-title { font-size: 20px; font-weight: 500; letter-spacing: -0.02em; margin-bottom: 3px; }
+  .page-sub { font-size: 13px; color: var(--text2); }
+  /* STATS */
+  .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 20px; }
+  .stat {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 14px 16px;
+  }
+  .stat-label { font-size: 11px; color: var(--text3); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 6px; }
+  .stat-val { font-size: 22px; font-weight: 500; letter-spacing: -0.03em; line-height: 1; }
+  .stat-sub { font-size: 11px; color: var(--text3); margin-top: 4px; }
+  .c-green { color: var(--green); }
+  .c-red { color: var(--red); }
+  .c-amber { color: var(--amber); }
+  .c-blue { color: var(--blue); }
+  /* CARD */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    margin-bottom: 12px;
+  }
+  .card-body { padding: 16px; }
+  /* TOOLBAR */
+  .toolbar {
+    padding: 12px 16px;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+  }
+  .search-input {
+    padding: 6px 12px;
+    font-size: 13px;
+    font-family: 'DM Sans', sans-serif;
+    border: 1px solid var(--border-med);
+    border-radius: var(--radius);
+    background: var(--surface2);
+    color: var(--text);
+    flex: 1;
+    min-width: 140px;
+    outline: none;
+    transition: border-color .15s;
+  }
+  .search-input:focus { border-color: var(--accent); background: var(--surface); }
+  .filter-select {
+    padding: 6px 10px;
+    font-size: 13px;
+    font-family: 'DM Sans', sans-serif;
+    border: 1px solid var(--border-med);
+    border-radius: var(--radius);
+    background: var(--surface2);
+    color: var(--text);
+    outline: none;
+    cursor: pointer;
+  }
+  /* TABS */
+  .tabs {
+    display: flex;
+    gap: 2px;
+    background: var(--surface2);
+    border-radius: var(--radius);
+    padding: 3px;
+    width: fit-content;
+  }
+  .tab {
+    padding: 5px 14px;
+    font-size: 13px;
+    font-family: 'DM Sans', sans-serif;
+    border: none;
+    background: none;
+    border-radius: 6px;
+    cursor: pointer;
+    color: var(--text2);
+    transition: all .15s;
+  }
+  .tab.active {
+    background: var(--surface);
+    color: var(--text);
+    font-weight: 500;
+    box-shadow: 0 1px 3px rgba(0,0,0,.08);
+  }
+  /* TABLE */
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th {
+    text-align: left;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text3);
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+    cursor: pointer;
+    user-select: none;
+    letter-spacing: .3px;
+    text-transform: uppercase;
+  }
+  th:hover { color: var(--text2); }
+  td { padding: 9px 12px; border-bottom: 1px solid var(--border); color: var(--text); white-space: nowrap; }
+  tr:last-child td { border-bottom: none; }
+  tbody tr:hover td { background: var(--surface2); }
+  .mono { font-family: 'DM Mono', monospace; font-size: 12px; }
+  /* BADGES */
+  .badge {
+    display: inline-flex; align-items: center;
+    padding: 2px 8px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 500;
+    white-space: nowrap;
+  }
+  .badge-green { background: var(--green-bg); color: var(--green-text); }
+  .badge-red { background: var(--red-bg); color: var(--red-text); }
+  .badge-amber { background: var(--amber-bg); color: var(--amber-text); }
+  .badge-blue { background: var(--blue-bg); color: var(--blue-text); }
+  .badge-gray { background: var(--surface2); color: var(--text2); border: 1px solid var(--border); }
+  /* WORKFLOW BUCKETS */
+  .bucket { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); margin-bottom: 10px; overflow: hidden; }
+  .bucket-hdr {
+    padding: 13px 16px;
+    display: flex; align-items: center; gap: 10px;
+    cursor: pointer;
+    transition: background .12s;
+  }
+  .bucket-hdr:hover { background: var(--surface2); }
+  .bucket-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .bucket-name { font-size: 13px; font-weight: 500; flex: 1; }
+  .bucket-count { font-size: 12px; color: var(--text2); background: var(--surface2); padding: 2px 9px; border-radius: 20px; border: 1px solid var(--border); }
+  .bucket-meta { display: flex; gap: 20px; padding: 10px 16px; background: var(--surface2); border-bottom: 1px solid var(--border); font-size: 12px; }
+  .bm-item { display: flex; flex-direction: column; gap: 1px; }
+  .bm-label { font-size: 10px; color: var(--text3); text-transform: uppercase; letter-spacing: .4px; }
+  .bm-val { font-weight: 500; }
+  .bucket-body { display: none; }
+  .bucket-body.open { display: block; }
+  /* WHEELS */
+  .wheel-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); margin-bottom: 12px; overflow: hidden; }
+  .wheel-top { padding: 14px 18px; display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 1px solid var(--border); }
+  .wheel-ticker { font-size: 16px; font-weight: 500; letter-spacing: -0.02em; }
+  .wheel-meta { font-size: 11px; color: var(--text3); margin-top: 2px; }
+  .wheel-pnl { text-align: right; }
+  .wheel-pnl-label { font-size: 11px; color: var(--text3); margin-bottom: 2px; }
+  .wheel-pnl-val { font-size: 15px; font-weight: 500; letter-spacing: -0.02em; }
+  .wheel-chain-wrap { padding: 16px 18px; overflow-x: auto; }
+  .wheel-chain { display: flex; align-items: center; gap: 6px; min-width: max-content; }
+  .leg {
+    border: 1.5px solid var(--border-med);
+    border-radius: 10px;
+    padding: 10px 14px;
+    min-width: 148px;
+    background: var(--surface2);
+    transition: border-color .15s;
+  }
+  .leg.open { border-color: var(--blue); background: var(--blue-bg); }
+  .leg.rolled { border-color: var(--amber); background: var(--amber-bg); opacity: .85; }
+  .leg.closed { border-color: var(--border-med); opacity: .7; }
+  .leg-type { font-size: 11px; color: var(--text2); margin-bottom: 5px; display: flex; align-items: center; gap: 4px; }
+  .leg-strike { font-size: 13px; font-weight: 500; font-family: 'DM Mono', monospace; }
+  .leg-exp { font-size: 11px; color: var(--text3); margin-top: 1px; }
+  .leg-prem { font-size: 12px; font-weight: 500; margin-top: 5px; }
+  .leg-prem.pos { color: var(--green); }
+  .leg-prem.neg { color: var(--red); }
+  .chain-arrow { color: var(--text3); font-size: 14px; flex-shrink: 0; }
+  .wheel-footer { padding: 10px 18px; border-top: 1px solid var(--border); display: flex; justify-content: space-between; font-size: 12px; color: var(--text2); background: var(--surface2); }
+  /* EMPTY */
+  .empty { text-align: center; padding: 56px 24px; color: var(--text3); }
+  .empty-title { font-size: 14px; font-weight: 500; color: var(--text2); margin-bottom: 6px; }
+  /* MODAL */
+  .modal-overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(0,0,0,.35);
+    z-index: 200;
+    align-items: center; justify-content: center;
+    padding: 20px;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal {
+    background: var(--surface);
+    border-radius: var(--radius-lg);
+    padding: 24px;
+    width: min(500px, 100%);
+    border: 1px solid var(--border-med);
+    max-height: 90vh;
+    overflow-y: auto;
+  }
+  .modal-title { font-size: 16px; font-weight: 500; letter-spacing: -0.02em; margin-bottom: 18px; }
+  .form-row { margin-bottom: 13px; }
+  .form-row label { display: block; font-size: 12px; color: var(--text2); margin-bottom: 4px; }
+  .form-row input, .form-row select {
+    width: 100%; padding: 8px 11px;
+    font-size: 13px; font-family: 'DM Sans', sans-serif;
+    border: 1px solid var(--border-med); border-radius: var(--radius);
+    background: var(--surface2); color: var(--text);
+    outline: none; transition: border-color .15s;
+  }
+  .form-row input:focus, .form-row select:focus { border-color: var(--accent); background: var(--surface); }
+  .form-2col { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .modal-footer { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; }
+  /* NOTICE */
+  .notice {
+    font-size: 12px; color: var(--blue-text);
+    background: var(--blue-bg); border: 1px solid rgba(24,95,165,.2);
+    border-radius: var(--radius); padding: 10px 13px; margin-bottom: 14px;
+    line-height: 1.5;
+  }
+  .notice.warn { background: var(--amber-bg); color: var(--amber-text); border-color: rgba(186,117,23,.2); }
+  /* UPLOAD */
+  .upload-area {
+    border: 1.5px dashed var(--border-med);
+    border-radius: var(--radius-lg);
+    padding: 28px;
+    text-align: center;
+    cursor: pointer;
+    background: var(--surface2);
+    transition: all .15s;
+  }
+  .upload-area:hover { border-color: var(--accent); background: var(--bg); }
+  .upload-area input { display: none; }
+  .upload-icon { font-size: 28px; margin-bottom: 10px; }
+  .upload-text { font-size: 13px; color: var(--text2); }
+  .upload-sub { font-size: 11px; color: var(--text3); margin-top: 4px; }
+  /* SYNC STATUS */
+  .sync-bar {
+    position: fixed; bottom: 16px; right: 16px;
+    background: var(--surface);
+    border: 1px solid var(--border-med);
+    border-radius: var(--radius-lg);
+    padding: 10px 16px;
+    font-size: 12px;
+    display: none;
+    align-items: center;
+    gap: 8px;
+    box-shadow: 0 4px 16px rgba(0,0,0,.08);
+    z-index: 100;
+  }
+  .sync-bar.show { display: flex; }
+  .sync-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); }
+  .sync-dot.syncing { background: var(--amber); animation: pulse 1s infinite; }
+  .sync-dot.error { background: var(--red); }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+  /* SETTINGS PAGE */
+  .settings-section { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 20px; margin-bottom: 16px; }
+  .settings-title { font-size: 14px; font-weight: 500; margin-bottom: 4px; }
+  .settings-sub { font-size: 12px; color: var(--text3); margin-bottom: 16px; }
+  .token-input-row { display: flex; gap: 8px; }
+  .token-input-row input { flex: 1; }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="logo">
+    <div class="logo-icon">
+      <svg viewBox="0 0 13 13"><polyline points="1,10 4,6 7,8 12,2"/></svg>
+    </div>
+    Wheel Tracker
+  </div>
+  <nav>
+    <button class="nav-btn active" onclick="showPage('trades',this)">Trades</button>
+    <button class="nav-btn" onclick="showPage('workflow',this)">Workflow</button>
+    <button class="nav-btn" onclick="showPage('wheels',this)">Wheels</button>
+    <button class="nav-btn" onclick="showPage('settings',this)">Settings</button>
+  </nav>
+  <div class="topbar-right">
+    <span id="sync-label" style="font-size:12px;color:var(--text3)"></span>
+    <button class="btn btn-sm" id="tt-conn-btn" onclick="openModal('conn-modal')">Connect Tastytrade</button>
+    <button class="btn btn-sm btn-primary" onclick="openModal('import-modal')">Import CSV</button>
+  </div>
+</div>
+
+<!-- TRADES PAGE -->
+<div class="page active" id="page-trades">
+  <div class="page-header">
+    <div class="page-title">Trades</div>
+    <div class="page-sub">Open and closed options positions</div>
+  </div>
+  <div class="stat-grid" id="trades-stats"></div>
+  <div class="card">
+    <div class="toolbar">
+      <div class="tabs">
+        <button class="tab active" onclick="setTradeTab('open',this)">Open</button>
+        <button class="tab" onclick="setTradeTab('closed',this)">Closed</button>
+        <button class="tab" onclick="setTradeTab('all',this)">All</button>
+      </div>
+      <input class="search-input" id="trade-search" placeholder="Search symbol…" oninput="renderTrades()">
+      <select class="filter-select" id="trade-type" onchange="renderTrades()">
+        <option value="">All types</option>
+        <option value="Put">Put</option>
+        <option value="Call">Call</option>
+      </select>
+      <button class="btn btn-sm btn-primary" onclick="openModal('add-modal')">+ Add trade</button>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th onclick="sortBy('symbol')">Symbol</th>
+            <th onclick="sortBy('type')">Type</th>
+            <th onclick="sortBy('strike')">Strike</th>
+            <th onclick="sortBy('qty')">Qty</th>
+            <th onclick="sortBy('expDate')">Expiration</th>
+            <th onclick="sortBy('dte')">DTE</th>
+            <th onclick="sortBy('netPremium')">Net premium</th>
+            <th onclick="sortBy('annYield')">Ann. yield</th>
+            <th onclick="sortBy('lastClose')">Last close</th>
+            <th onclick="sortBy('itmOtm')">ITM/OTM</th>
+            <th onclick="sortBy('status')">Status</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="trades-tbody"></tbody>
+      </table>
+    </div>
+    <div id="trades-empty" class="empty" style="display:none">
+      <div style="font-size:32px;margin-bottom:12px">📋</div>
+      <div class="empty-title">No trades yet</div>
+      <div>Import a Tastytrade CSV or connect via API to get started.</div>
+    </div>
+  </div>
+</div>
+
+<!-- WORKFLOW PAGE -->
+<div class="page" id="page-workflow">
+  <div class="page-header">
+    <div class="page-title">Workflow</div>
+    <div class="page-sub">Open trades organized by action priority</div>
+  </div>
+  <div class="stat-grid" id="wf-stats"></div>
+  <div id="wf-buckets"></div>
+  <div id="wf-empty" class="empty" style="display:none">
+    <div style="font-size:32px;margin-bottom:12px">⚡</div>
+    <div class="empty-title">No open trades</div>
+    <div>Import trades to populate your workflow view.</div>
+  </div>
+</div>
+
+<!-- WHEELS PAGE -->
+<div class="page" id="page-wheels">
+  <div class="page-header">
+    <div class="page-title">Options Wheels</div>
+    <div class="page-sub">Complete wheel strategy cycles by ticker</div>
+  </div>
+  <div class="tabs" style="margin-bottom:16px">
+    <button class="tab active" onclick="setWheelTab('open',this)">Open wheels</button>
+    <button class="tab" onclick="setWheelTab('closed',this)">Closed wheels</button>
+    <button class="tab" onclick="setWheelTab('all',this)">All</button>
+  </div>
+  <div id="wheels-list"></div>
+  <div id="wheels-empty" class="empty" style="display:none">
+    <div style="font-size:32px;margin-bottom:12px">🔄</div>
+    <div class="empty-title">No wheels yet</div>
+    <div>Wheels are automatically grouped from your trades by ticker.</div>
+  </div>
+</div>
+
+<!-- SETTINGS PAGE -->
+<div class="page" id="page-settings">
+  <div class="page-header">
+    <div class="page-title">Settings</div>
+    <div class="page-sub">GitHub storage and Tastytrade API configuration</div>
+  </div>
+
+  <div class="settings-section">
+    <div class="settings-title">GitHub storage</div>
+    <div class="settings-sub">Trades are saved to your GitHub repo so data persists across devices.</div>
+    <div class="form-row">
+      <label>GitHub username</label>
+      <input id="s-gh-user" placeholder="kgriffen" value="kgriffen">
+    </div>
+    <div class="form-row">
+      <label>Repository name</label>
+      <input id="s-gh-repo" placeholder="wheel-tracker" value="wheel-tracker">
+    </div>
+    <div class="form-row">
+      <label>Personal access token</label>
+      <div class="token-input-row">
+        <input id="s-gh-token" type="password" placeholder="ghp_xxxxxxxxxxxx">
+        <button class="btn" onclick="testGitHub()">Test connection</button>
+      </div>
+    </div>
+    <div id="gh-test-result" style="font-size:12px;margin-top:8px"></div>
+    <div style="margin-top:14px;display:flex;gap:8px">
+      <button class="btn btn-primary" onclick="saveSettings()">Save settings</button>
+      <button class="btn" onclick="forceSyncGitHub()">Sync now</button>
+    </div>
+  </div>
+
+  <div class="settings-section">
+    <div class="settings-title">Data management</div>
+    <div class="settings-sub">Import, export, or clear your trade data.</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn" onclick="exportJSON()">Export trades (JSON)</button>
+      <button class="btn" onclick="exportCSV()">Export trades (CSV)</button>
+      <button class="btn" style="color:var(--red-text);border-color:var(--red)" onclick="clearAllData()">Clear all data</button>
+    </div>
+  </div>
+</div>
+
+<!-- SYNC BAR -->
+<div class="sync-bar" id="sync-bar">
+  <div class="sync-dot" id="sync-dot"></div>
+  <span id="sync-msg"></span>
+</div>
+
+<!-- ADD TRADE MODAL -->
+<div class="modal-overlay" id="add-modal">
+  <div class="modal">
+    <div class="modal-title">Add trade</div>
+    <div class="form-2col">
+      <div class="form-row"><label>Symbol</label><input id="f-sym" placeholder="AAPL" style="text-transform:uppercase"></div>
+      <div class="form-row"><label>Type</label><select id="f-type"><option>Put</option><option>Call</option></select></div>
+    </div>
+    <div class="form-2col">
+      <div class="form-row"><label>Strike ($)</label><input id="f-strike" type="number" step="0.5" placeholder="150.00"></div>
+      <div class="form-row"><label>Contracts</label><input id="f-qty" type="number" value="1" min="1"></div>
+    </div>
+    <div class="form-2col">
+      <div class="form-row"><label>Expiration date</label><input id="f-exp" type="date"></div>
+      <div class="form-row"><label>Open date</label><input id="f-open-date" type="date"></div>
+    </div>
+    <div class="form-2col">
+      <div class="form-row"><label>Net premium ($)</label><input id="f-prem" type="number" step="0.01" placeholder="0.00"></div>
+      <div class="form-row"><label>Capital at risk ($)</label><input id="f-capital" type="number" placeholder="auto"></div>
+    </div>
+    <div class="form-2col">
+      <div class="form-row"><label>Last close (underlying)</label><input id="f-close" type="number" step="0.01" placeholder="underlying price"></div>
+      <div class="form-row"><label>Status</label>
+        <select id="f-status">
+          <option value="open">Open</option>
+          <option value="closed">Closed</option>
+          <option value="rolled">Rolled</option>
+          <option value="assigned">Assigned</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-row"><label>Notes</label><input id="f-notes" placeholder="Optional notes"></div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('add-modal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveTrade()">Save trade</button>
+    </div>
+  </div>
+</div>
+
+<!-- IMPORT CSV MODAL -->
+<div class="modal-overlay" id="import-modal">
+  <div class="modal">
+    <div class="modal-title">Import Tastytrade CSV</div>
+    <div class="notice">In Tastytrade: go to <strong>Account → History</strong>, set your date range, then export as CSV. The app maps columns automatically.</div>
+    <div class="upload-area" onclick="document.getElementById('csv-file').click()">
+      <input type="file" id="csv-file" accept=".csv" onchange="handleCSV(event)">
+      <div class="upload-icon">📄</div>
+      <div class="upload-text">Click to select your CSV file</div>
+      <div class="upload-sub">Tastytrade transaction history export</div>
+    </div>
+    <div id="csv-result" style="margin-top:14px;font-size:13px;display:none"></div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('import-modal')">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- TASTYTRADE API MODAL -->
+<div class="modal-overlay" id="conn-modal">
+  <div class="modal">
+    <div class="modal-title">Connect Tastytrade API</div>
+    <div class="notice">Your credentials are sent only to Tastytrade's API servers to obtain a session token. Nothing is stored externally beyond your GitHub repo.</div>
+    <div class="notice warn" id="cors-notice" style="display:none">If the connection fails with a CORS error, use CSV import instead — Tastytrade may restrict direct browser API calls.</div>
+    <div class="form-row"><label>Username or email</label><input id="tt-user" type="text" placeholder="your@email.com"></div>
+    <div class="form-row"><label>Password</label><input id="tt-pass" type="password" placeholder="••••••••"></div>
+    <button class="btn btn-primary" style="width:100%" onclick="connectTastytrade()">Sign in and fetch positions</button>
+    <div id="tt-result" style="margin-top:12px;font-size:13px;display:none"></div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('conn-modal')">Close</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─── STATE ───────────────────────────────────────────────
+let trades = [];
+let sortCol = 'dte';
+let sortAsc = true;
+let tradeTab = 'open';
+let wheelTab = 'open';
+let ghConfig = { user: 'kgriffen', repo: 'wheel-tracker', token: '' };
+let saveSha = null;
+
+const DATA_FILE = 'trades.json';
+
+// ─── INIT ─────────────────────────────────────────────────
+window.addEventListener('DOMContentLoaded', () => {
+  const saved = localStorage.getItem('wt_gh_config');
+  if (saved) { try { ghConfig = {...ghConfig, ...JSON.parse(saved)}; } catch(e){} }
+  document.getElementById('s-gh-user').value = ghConfig.user;
+  document.getElementById('s-gh-repo').value = ghConfig.repo;
+  document.getElementById('s-gh-token').value = ghConfig.token;
+  loadFromGitHub();
+});
+
+// ─── GITHUB STORAGE ───────────────────────────────────────
+function ghHeaders() {
+  return {
+    'Authorization': 'token ' + ghConfig.token,
+    'Accept': 'application/vnd.github.v3+json',
+    'Content-Type': 'application/json'
+  };
+}
+
+function ghFileUrl() {
+  return `https://api.github.com/repos/${ghConfig.user}/${ghConfig.repo}/contents/${DATA_FILE}`;
+}
+
+async function loadFromGitHub() {
+  if (!ghConfig.token) { loadLocal(); return; }
+  showSync('syncing', 'Loading from GitHub…');
+  try {
+    const r = await fetch(ghFileUrl(), { headers: ghHeaders() });
+    if (r.status === 404) { loadLocal(); showSync('ok', 'GitHub connected — no data yet'); return; }
+    if (!r.ok) throw new Error('HTTP '+r.status);
+    const data = await r.json();
+    saveSha = data.sha;
+    const decoded = JSON.parse(atob(data.content.replace(/\n/g,'')));
+    trades = decoded.trades || [];
+    localStorage.setItem('wt_trades', JSON.stringify(trades));
+    showSync('ok', 'Synced from GitHub');
+    renderAll();
+  } catch(e) {
+    loadLocal();
+    showSync('error', 'GitHub load failed — using local data');
+  }
+}
+
+function loadLocal() {
+  try { trades = JSON.parse(localStorage.getItem('wt_trades') || '[]'); } catch(e){ trades=[]; }
+  renderAll();
+}
+
+async function saveToGitHub() {
+  if (!ghConfig.token) { localStorage.setItem('wt_trades', JSON.stringify(trades)); return; }
+  showSync('syncing', 'Saving to GitHub…');
+  try {
+    const content = btoa(JSON.stringify({ trades, updated: new Date().toISOString() }, null, 2));
+    const body = { message: 'Update trades ' + new Date().toISOString().split('T')[0], content };
+    if (saveSha) body.sha = saveSha;
+    const r = await fetch(ghFileUrl(), { method: 'PUT', headers: ghHeaders(), body: JSON.stringify(body) });
+    if (!r.ok) throw new Error('HTTP '+r.status);
+    const data = await r.json();
+    saveSha = data.content?.sha;
+    localStorage.setItem('wt_trades', JSON.stringify(trades));
+    showSync('ok', 'Saved to GitHub ✓');
+  } catch(e) {
+    localStorage.setItem('wt_trades', JSON.stringify(trades));
+    showSync('error', 'GitHub save failed — saved locally');
+  }
+}
+
+async function testGitHub() {
+  const u = document.getElementById('s-gh-user').value.trim();
+  const rp = document.getElementById('s-gh-repo').value.trim();
+  const tk = document.getElementById('s-gh-token').value.trim();
+  const el = document.getElementById('gh-test-result');
+  el.textContent = 'Testing…'; el.style.color = 'var(--text3)';
+  try {
+    const r = await fetch(`https://api.github.com/repos/${u}/${rp}`, {
+      headers: { 'Authorization': 'token '+tk, 'Accept': 'application/vnd.github.v3+json' }
+    });
+    if (r.ok) {
+      el.textContent = '✓ Connected successfully'; el.style.color = 'var(--green)';
+    } else {
+      el.textContent = '✗ Failed (HTTP '+r.status+') — check token and repo name'; el.style.color = 'var(--red)';
+    }
+  } catch(e) { el.textContent = '✗ Network error: '+e.message; el.style.color = 'var(--red)'; }
+}
+
+function saveSettings() {
+  ghConfig.user = document.getElementById('s-gh-user').value.trim();
+  ghConfig.repo = document.getElementById('s-gh-repo').value.trim();
+  ghConfig.token = document.getElementById('s-gh-token').value.trim();
+  localStorage.setItem('wt_gh_config', JSON.stringify(ghConfig));
+  loadFromGitHub();
+}
+
+async function forceSyncGitHub() { await loadFromGitHub(); }
+
+function showSync(state, msg) {
+  const bar = document.getElementById('sync-bar');
+  const dot = document.getElementById('sync-dot');
+  const txt = document.getElementById('sync-msg');
+  const label = document.getElementById('sync-label');
+  dot.className = 'sync-dot' + (state==='syncing'?' syncing':state==='error'?' error':'');
+  txt.textContent = msg;
+  label.textContent = state === 'ok' ? 'GitHub ✓' : state === 'error' ? 'Local only' : '';
+  bar.classList.add('show');
+  if (state !== 'syncing') setTimeout(() => bar.classList.remove('show'), 3000);
+}
+
+// ─── HELPERS ─────────────────────────────────────────────
+function calcDTE(expDate) {
+  if (!expDate) return null;
+  const now = new Date(); now.setHours(0,0,0,0);
+  return Math.round((new Date(expDate) - now) / 86400000);
+}
+
+function calcITMOTM(type, strike, last) {
+  const s = parseFloat(strike), l = parseFloat(last);
+  if (!s || !l || isNaN(s) || isNaN(l)) return null;
+  const pct = ((s - l) / l) * 100;
+  if (type === 'Put') {
+    if (s > l * 1.02) return { label:'ITM', pct: pct.toFixed(1) };
+    if (s > l * 0.98) return { label:'ATM', pct: pct.toFixed(1) };
+    return { label:'OTM', pct: pct.toFixed(1) };
+  } else {
+    if (s < l * 0.98) return { label:'ITM', pct: (-pct).toFixed(1) };
+    if (s < l * 1.02) return { label:'ATM', pct: pct.toFixed(1) };
+    return { label:'OTM', pct: pct.toFixed(1) };
+  }
+}
+
+function calcAnnYield(prem, cap, dte) {
+  const p = parseFloat(prem), c = parseFloat(cap), d = parseInt(dte);
+  if (!p || !c || !d || d <= 0) return null;
+  return ((p / c) * (365 / d) * 100).toFixed(1);
+}
+
+function fmt$(v, sign=false) {
+  const n = parseFloat(v);
+  if (isNaN(n) || v===null || v==='') return '—';
+  const abs = Math.abs(n).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+  if (sign) return (n>=0?'+$':'-$') + abs;
+  return '$' + abs;
+}
+
+function itmBadge(itm) {
+  if (!itm) return '—';
+  const cls = itm.label==='ITM'?'badge-red':itm.label==='ATM'?'badge-amber':'badge-green';
+  return `<span class="badge ${cls}">${itm.label} ${Math.abs(itm.pct)}%</span>`;
+}
+
+function statusBadge(s) {
+  const map = { open:'badge-blue', closed:'badge-gray', rolled:'badge-amber', assigned:'badge-red' };
+  return `<span class="badge ${map[s]||'badge-gray'}">${s}</span>`;
+}
+
+// ─── PAGE NAV ────────────────────────────────────────────
+function showPage(id, btn) {
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('page-'+id).classList.add('active');
+  if(btn) btn.classList.add('active');
+  renderAll();
+}
+
+function openModal(id) { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+document.querySelectorAll('.modal-overlay').forEach(m => {
+  m.addEventListener('click', e => { if(e.target===m) m.classList.remove('open'); });
+});
+
+// ─── TRADES ──────────────────────────────────────────────
+function setTradeTab(t, btn) {
+  tradeTab = t;
+  document.querySelectorAll('#page-trades .tab').forEach(b=>b.classList.remove('active'));
+  if(btn) btn.classList.add('active');
+  renderTrades();
+}
+
+function sortBy(col) {
+  sortAsc = sortCol===col ? !sortAsc : true;
+  sortCol = col;
+  renderTrades();
+}
+
+function getFiltered() {
+  const q = (document.getElementById('trade-search')?.value||'').toLowerCase();
+  const tf = document.getElementById('trade-type')?.value||'';
+  return trades
+    .filter(t => tradeTab==='all' ? true : tradeTab==='open' ? t.status==='open' : t.status!=='open')
+    .filter(t => !q || t.symbol.toLowerCase().includes(q))
+    .filter(t => !tf || t.type===tf)
+    .map(t => ({
+      ...t,
+      dte: calcDTE(t.expDate),
+      itmOtm: calcITMOTM(t.type, t.strike, t.lastClose)?.label || ''
+    }))
+    .sort((a,b) => {
+      let av=a[sortCol], bv=b[sortCol];
+      if(typeof av==='string') av=av.toLowerCase();
+      if(typeof bv==='string') bv=bv.toLowerCase();
+      if(av==null) return 1; if(bv==null) return -1;
+      return (av<bv?-1:av>bv?1:0)*(sortAsc?1:-1);
+    });
+}
+
+function renderTrades() {
+  const open = trades.filter(t=>t.status==='open');
+  const totalPrem = open.reduce((s,t)=>s+(parseFloat(t.netPremium)||0),0);
+  const itmCount = open.filter(t=>{const r=calcITMOTM(t.type,t.strike,t.lastClose);return r?.label==='ITM';}).length;
+  const avgDTE = open.length ? Math.round(open.reduce((s,t)=>s+(calcDTE(t.expDate)||0),0)/open.length) : 0;
+  const closedPL = trades.filter(t=>t.status==='closed').reduce((s,t)=>s+(parseFloat(t.netPremium)||0),0);
+
+  document.getElementById('trades-stats').innerHTML = `
+    <div class="stat"><div class="stat-label">Open trades</div><div class="stat-val">${open.length}</div></div>
+    <div class="stat"><div class="stat-label">% ITM</div><div class="stat-val ${open.length&&itmCount/open.length>.3?'c-red':'c-green'}">${open.length?((itmCount/open.length)*100).toFixed(1):0}%</div><div class="stat-sub">${itmCount} of ${open.length}</div></div>
+    <div class="stat"><div class="stat-label">Open premium</div><div class="stat-val c-green">${fmt$(totalPrem)}</div></div>
+    <div class="stat"><div class="stat-label">Avg DTE</div><div class="stat-val">${avgDTE}d</div></div>
+    <div class="stat"><div class="stat-label">Closed P/L</div><div class="stat-val ${closedPL>=0?'c-green':'c-red'}">${fmt$(closedPL,true)}</div></div>
+  `;
+
+  const list = getFiltered();
+  const tbody = document.getElementById('trades-tbody');
+  const empty = document.getElementById('trades-empty');
+
+  if(!list.length){ tbody.innerHTML=''; empty.style.display='block'; return; }
+  empty.style.display='none';
+
+  tbody.innerHTML = list.map(t => {
+    const dte = calcDTE(t.expDate);
+    const itm = calcITMOTM(t.type, t.strike, t.lastClose);
+    const ay = calcAnnYield(t.netPremium, t.capital, dte);
+    const prem = parseFloat(t.netPremium)||0;
+    const dteStr = dte===null?'—':(dte<0?`<span class="c-red">${dte}d</span>`:`${dte}d`);
+    return `<tr>
+      <td><strong>${t.symbol}</strong></td>
+      <td>${t.type}</td>
+      <td class="mono">${t.strike?'$'+parseFloat(t.strike).toFixed(2):'—'}</td>
+      <td>${t.qty}</td>
+      <td class="mono">${t.expDate||'—'}</td>
+      <td class="mono">${dteStr}</td>
+      <td class="mono" style="color:${prem>=0?'var(--green)':'var(--red)'}">${fmt$(t.netPremium)}</td>
+      <td class="mono">${ay?ay+'%':'—'}</td>
+      <td class="mono">${t.lastClose?'$'+parseFloat(t.lastClose).toFixed(2):'—'}</td>
+      <td>${itmBadge(itm)}</td>
+      <td>${statusBadge(t.status)}</td>
+      <td><button class="btn btn-sm" onclick="deleteTrade(${t.id})" style="color:var(--text3);padding:2px 8px">✕</button></td>
+    </tr>`;
+  }).join('');
+}
+
+function saveTrade() {
+  const sym = document.getElementById('f-sym').value.trim().toUpperCase();
+  if(!sym){ alert('Symbol is required'); return; }
+  const strike = parseFloat(document.getElementById('f-strike').value)||0;
+  const qty = parseInt(document.getElementById('f-qty').value)||1;
+  const expDate = document.getElementById('f-exp').value;
+  const netPremium = parseFloat(document.getElementById('f-prem').value)||0;
+  const capital = parseFloat(document.getElementById('f-capital').value)||(strike*100*qty);
+  const lastClose = parseFloat(document.getElementById('f-close').value)||null;
+  const dte = calcDTE(expDate);
+  trades.unshift({
+    id: Date.now(),
+    symbol: sym,
+    type: document.getElementById('f-type').value,
+    strike, qty, expDate,
+    openDate: document.getElementById('f-open-date').value || new Date().toISOString().split('T')[0],
+    netPremium, capital, lastClose,
+    status: document.getElementById('f-status').value,
+    notes: document.getElementById('f-notes').value,
+    annYield: calcAnnYield(netPremium, capital, dte)
+  });
+  saveToGitHub(); closeModal('add-modal'); renderAll();
+  ['f-sym','f-strike','f-prem','f-capital','f-close','f-exp','f-notes'].forEach(id=>{document.getElementById(id).value='';});
+}
+
+function deleteTrade(id) {
+  if(!confirm('Delete this trade?')) return;
+  trades = trades.filter(t=>t.id!==id);
+  saveToGitHub(); renderAll();
+}
+
+// ─── CSV IMPORT ──────────────────────────────────────────
+function handleCSV(e) {
+  const file = e.target.files[0]; if(!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    const lines = ev.target.result.split('\n').map(l=>l.trim()).filter(Boolean);
+    const el = document.getElementById('csv-result');
+    if(lines.length<2){ el.style.display='block'; el.textContent='CSV appears empty.'; return; }
+    const headers = lines[0].split(',').map(h=>h.replace(/"/g,'').trim().toLowerCase());
+    let added=0, skipped=0;
+    for(let i=1;i<lines.length;i++){
+      const cols = parseCSVLine(lines[i]);
+      const row={};
+      headers.forEach((h,j)=>row[h]=cols[j]||'');
+      // Tastytrade CSV columns
+      const sym = (row['symbol']||row['underlying symbol']||row['underlying']||'').replace(/[^A-Z]/gi,'').toUpperCase();
+      if(!sym){ skipped++; continue; }
+      const typeRaw = row['call or put']||row['type']||row['option type']||'';
+      const optType = /call/i.test(typeRaw)?'Call':'Put';
+      const strike = parseFloat(row['strike price']||row['strike']||0);
+      if(!strike){ skipped++; continue; }
+      const expDate = normalizeDate(row['expiration date']||row['expiry']||row['exp date']||'');
+      const qty = Math.abs(parseInt(row['quantity']||row['qty']||1));
+      const amount = parseFloat(row['value']||row['amount']||row['net premium']||row['premium']||0);
+      const openDate = normalizeDate(row['date']||row['trade date']||row['executed at']||'');
+      const lastClose = parseFloat(row['last']||row['last close']||row['underlying price']||0)||null;
+      const capital = strike * 100 * qty;
+      const dte = calcDTE(expDate);
+      trades.push({
+        id: Date.now()+i+Math.random(),
+        symbol:sym, type:optType, strike, qty, expDate, openDate,
+        netPremium: Math.abs(amount), capital, lastClose,
+        status: 'open',
+        annYield: calcAnnYield(Math.abs(amount), capital, dte),
+        notes: ''
+      });
+      added++;
+    }
+    saveToGitHub(); renderAll();
+    el.style.display='block';
+    el.innerHTML = added
+      ? `<span style="color:var(--green)">✓ Imported ${added} trade${added!==1?'s':''}${skipped?` (${skipped} rows skipped)`:''}</span>`
+      : `<span style="color:var(--red)">No trades found. Check that this is a Tastytrade history export.</span>`;
+  };
+  reader.readAsText(file);
+}
+
+function parseCSVLine(line) {
+  const result=[]; let cur='', inQ=false;
+  for(let i=0;i<line.length;i++){
+    const c=line[i];
+    if(c==='"'){inQ=!inQ;}
+    else if(c===','&&!inQ){result.push(cur.trim());cur='';}
+    else cur+=c;
+  }
+  result.push(cur.trim()); return result;
+}
+
+function normalizeDate(s) {
+  if(!s) return '';
+  const d = new Date(s);
+  if(isNaN(d.getTime())) return s;
+  return d.toISOString().split('T')[0];
+}
+
+// ─── TASTYTRADE API ───────────────────────────────────────
+async function connectTastytrade() {
+  const user=document.getElementById('tt-user').value.trim();
+  const pass=document.getElementById('tt-pass').value;
+  const el=document.getElementById('tt-result');
+  if(!user||!pass){ el.style.display='block'; el.textContent='Enter username and password.'; return; }
+  el.style.display='block'; el.style.color='var(--text3)'; el.textContent='Connecting to Tastytrade…';
+  try {
+    const r = await fetch('https://api.tastytrade.com/sessions',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({'login':user,'password':pass,'remember-me':false})
+    });
+    if(!r.ok){ el.textContent='Login failed — check credentials.'; el.style.color='var(--red)'; document.getElementById('cors-notice').style.display='block'; return; }
+    const data=await r.json();
+    const token=data?.data?.['session-token'];
+    if(!token){ el.textContent='No session token returned.'; el.style.color='var(--red)'; return; }
+    el.textContent='Fetching accounts…';
+    const ar=await fetch('https://api.tastytrade.com/customers/me/accounts',{headers:{'Authorization':token}});
+    const ad=await ar.json();
+    const acct=ad?.data?.items?.[0]?.account?.['account-number'];
+    if(!acct){ el.textContent='No accounts found.'; el.style.color='var(--red)'; return; }
+    el.textContent='Fetching positions…';
+    const pr=await fetch(`https://api.tastytrade.com/accounts/${acct}/positions`,{headers:{'Authorization':token}});
+    const pd=await pr.json();
+    const items=pd?.data?.items||[];
+    let added=0;
+    items.forEach((p,i)=>{
+      if(p['instrument-type']!=='Equity Option') return;
+      const sym=(p['underlying-symbol']||'').toUpperCase();
+      const strike=parseFloat(p['strike-price']||0);
+      const expDate=normalizeDate(p['expiration-date']||'');
+      const optType=/call/i.test(p['call-or-put']||'')?'Call':'Put';
+      const qty=Math.abs(parseInt(p['quantity']||1));
+      const cost=Math.abs(parseFloat(p['cost-effect']||p['average-open-price']||0))*100*qty;
+      const lastClose=parseFloat(p['close-price']||0)||null;
+      const dte=calcDTE(expDate);
+      trades.push({
+        id:Date.now()+i+Math.random(),
+        symbol:sym, type:optType, strike, qty, expDate,
+        openDate:new Date().toISOString().split('T')[0],
+        netPremium:cost, capital:strike*100*qty, lastClose,
+        status:'open', annYield:calcAnnYield(cost,strike*100*qty,dte), notes:''
+      });
+      added++;
+    });
+    saveToGitHub(); renderAll();
+    el.textContent=`✓ Imported ${added} live position${added!==1?'s':''}. Token valid ~24h.`;
+    el.style.color='var(--green)';
+    document.getElementById('tt-conn-btn').textContent='Tastytrade ✓';
+    document.getElementById('tt-conn-btn').className='btn btn-sm btn-connected';
+  } catch(err){
+    el.textContent='Connection error: '+err.message;
+    el.style.color='var(--red)';
+    document.getElementById('cors-notice').style.display='block';
+  }
+}
+
+// ─── WORKFLOW ────────────────────────────────────────────
+const BUCKETS=[
+  {id:'take-profits',label:'Take profits',color:'#7F77DD'},
+  {id:'working',label:'Working',color:'#1D9E75'},
+  {id:'warning',label:'Warning',color:'#EF9F27'},
+  {id:'urgent',label:'Urgent',color:'#D85A30'},
+  {id:'uncategorized',label:'Uncategorized',color:'#888780'}
+];
+
+function getBucket(t){
+  const dte=calcDTE(t.expDate);
+  const itm=calcITMOTM(t.type,t.strike,t.lastClose);
+  const pct=t.premiumCaptured||0;
+  if(pct>=50) return 'take-profits';
+  if(itm?.label==='ITM'&&dte!==null&&dte<14) return 'urgent';
+  if(itm?.label==='ITM') return 'warning';
+  if(t.status==='open') return 'working';
+  return 'uncategorized';
+}
+
+function renderWorkflow(){
+  const open=trades.filter(t=>t.status==='open');
+  const totalPrem=open.reduce((s,t)=>s+(parseFloat(t.netPremium)||0),0);
+  const avgDTE=open.length?Math.round(open.reduce((s,t)=>s+(calcDTE(t.expDate)||0),0)/open.length):0;
+  document.getElementById('wf-stats').innerHTML=`
+    <div class="stat"><div class="stat-label">Open trades</div><div class="stat-val">${open.length}</div></div>
+    <div class="stat"><div class="stat-label">Total premium</div><div class="stat-val c-green">${fmt$(totalPrem)}</div></div>
+    <div class="stat"><div class="stat-label">Avg DTE</div><div class="stat-val">${avgDTE}d</div></div>
+  `;
+  const wfEmpty=document.getElementById('wf-empty');
+  const wfBuckets=document.getElementById('wf-buckets');
+  if(!open.length){ wfBuckets.innerHTML=''; wfEmpty.style.display='block'; return; }
+  wfEmpty.style.display='none';
+  const bucketed={};
+  BUCKETS.forEach(b=>bucketed[b.id]=[]);
+  open.forEach(t=>{ const b=getBucket(t); (bucketed[b]||bucketed['uncategorized']).push(t); });
+  wfBuckets.innerHTML=BUCKETS.map(b=>{
+    const list=bucketed[b.id]; if(!list.length) return '';
+    const tp=list.reduce((s,t)=>s+(parseFloat(t.netPremium)||0),0);
+    const ad=Math.round(list.reduce((s,t)=>s+(calcDTE(t.expDate)||0),0)/list.length);
+    const rows=list.map(t=>{
+      const dte=calcDTE(t.expDate);
+      const itm=calcITMOTM(t.type,t.strike,t.lastClose);
+      return `<tr>
+        <td><strong>${t.symbol}</strong></td>
+        <td>${t.type.toLowerCase()}</td>
+        <td class="mono">${t.strike?'$'+parseFloat(t.strike).toFixed(2):'—'}</td>
+        <td>${t.qty}</td>
+        <td class="mono">${t.lastClose?'$'+parseFloat(t.lastClose).toFixed(2):'—'}</td>
+        <td class="mono">${dte!==null?dte+'d':'—'}</td>
+        <td class="mono" style="color:var(--green)">${fmt$(t.netPremium)}</td>
+        <td>${itmBadge(itm)}</td>
+      </tr>`;
+    }).join('');
+    return `<div class="bucket">
+      <div class="bucket-hdr" onclick="toggleBucket(this)">
+        <div class="bucket-dot" style="background:${b.color}"></div>
+        <div class="bucket-name">${b.label}</div>
+        <div class="bucket-count">${list.length}</div>
+      </div>
+      <div class="bucket-meta">
+        <div class="bm-item"><div class="bm-label">Trades</div><div class="bm-val">${list.length}</div></div>
+        <div class="bm-item"><div class="bm-label">Total premium</div><div class="bm-val c-green">${fmt$(tp)}</div></div>
+        <div class="bm-item"><div class="bm-label">Avg DTE</div><div class="bm-val">${ad}d</div></div>
+      </div>
+      <div class="bucket-body open">
+        <div class="table-wrap">
+          <table><thead><tr><th>Symbol</th><th>Type</th><th>Strike</th><th>Qty</th><th>Last close</th><th>DTE</th><th>Net premium</th><th>ITM/OTM</th></tr></thead>
+          <tbody>${rows}</tbody></table>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function toggleBucket(hdr){
+  const body=hdr.parentElement.querySelector('.bucket-body');
+  body.classList.toggle('open');
+}
+
+// ─── WHEELS ──────────────────────────────────────────────
+function setWheelTab(t,btn){
+  wheelTab=t;
+  document.querySelectorAll('#page-wheels .tab').forEach(b=>b.classList.remove('active'));
+  if(btn) btn.classList.add('active');
+  renderWheels();
+}
+
+function buildWheels(){
+  const bySymbol={};
+  trades.forEach(t=>{
+    if(!bySymbol[t.symbol]) bySymbol[t.symbol]=[];
+    bySymbol[t.symbol].push(t);
+  });
+  return Object.entries(bySymbol).map(([symbol,legs])=>{
+    const sorted=[...legs].sort((a,b)=>new Date(a.openDate||0)-new Date(b.openDate||0));
+    const totalPrem=sorted.reduce((s,t)=>s+(parseFloat(t.netPremium)||0),0);
+    const isOpen=sorted.some(t=>t.status==='open'||t.status==='rolled');
+    return {symbol, legs:sorted, totalPrem, isOpen, started:sorted[0]?.openDate||'—'};
+  });
+}
+
+function renderWheels(){
+  const all=buildWheels();
+  const filtered=wheelTab==='all'?all:wheelTab==='open'?all.filter(w=>w.isOpen):all.filter(w=>!w.isOpen);
+  const el=document.getElementById('wheels-list');
+  const empty=document.getElementById('wheels-empty');
+  if(!filtered.length){ el.innerHTML=''; empty.style.display='block'; return; }
+  empty.style.display='none';
+  el.innerHTML=filtered.map(w=>{
+    const lastOpen=w.legs.find(l=>l.status==='open');
+    const chainHtml=w.legs.map((t,i)=>{
+      const isOpen=t.status==='open';
+      const isRolled=t.status==='rolled';
+      const prem=parseFloat(t.netPremium)||0;
+      const arrow=i>0?'<span class="chain-arrow">→</span>':'';
+      return `${arrow}<div class="leg ${isOpen?'open':isRolled?'rolled':'closed'}">
+        <div class="leg-type">${isRolled?'↺ Rolled':isOpen?'○ Open':'✓ Closed'} &nbsp; ${t.type}</div>
+        <div class="leg-strike">$${parseFloat(t.strike||0).toFixed(2)}</div>
+        <div class="leg-exp">${t.expDate||'—'}</div>
+        <div class="leg-prem ${prem>=0?'pos':'neg'}">${fmt$(prem,true)}</div>
+      </div>`;
+    }).join('');
+    const dur=w.started&&w.legs[w.legs.length-1]?.expDate
+      ?Math.round((new Date(w.legs[w.legs.length-1].expDate)-new Date(w.started))/86400000):null;
+    return `<div class="wheel-card">
+      <div class="wheel-top">
+        <div>
+          <div class="wheel-ticker">${w.symbol}</div>
+          <div class="wheel-meta">Started ${w.started} · ${w.legs.length} trade${w.legs.length!==1?'s':''}</div>
+        </div>
+        <div class="wheel-pnl">
+          <div class="wheel-pnl-label">Net P/L</div>
+          <div class="wheel-pnl-val ${w.totalPrem>=0?'c-green':'c-red'}">${fmt$(w.totalPrem,true)}</div>
+        </div>
+      </div>
+      <div class="wheel-chain-wrap"><div class="wheel-chain">${chainHtml}</div></div>
+      <div class="wheel-footer">
+        <span>Net premiums: <strong style="color:var(--green)">${fmt$(w.totalPrem)}</strong>${dur!==null?' · Duration: '+dur+'d':''}</span>
+        ${lastOpen?.lastClose?`<span>Current price: $${parseFloat(lastOpen.lastClose).toFixed(2)}</span>`:''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ─── EXPORT / CLEAR ───────────────────────────────────────
+function exportJSON(){
+  const blob=new Blob([JSON.stringify({trades},null,2)],{type:'application/json'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+  a.download='wheel-tracker-export.json'; a.click();
+}
+
+function exportCSV(){
+  const headers=['Symbol','Type','Strike','Qty','Exp Date','Open Date','Net Premium','Capital','Last Close','Status','Notes'];
+  const rows=trades.map(t=>[t.symbol,t.type,t.strike,t.qty,t.expDate,t.openDate,t.netPremium,t.capital,t.lastClose||'',t.status,t.notes||''].join(','));
+  const blob=new Blob([[headers.join(','),...rows].join('\n')],{type:'text/csv'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+  a.download='wheel-tracker-trades.csv'; a.click();
+}
+
+function clearAllData(){
+  if(!confirm('Delete ALL trade data? This cannot be undone.')) return;
+  trades=[];
+  saveSha=null;
+  saveToGitHub(); renderAll();
+}
+
+// ─── RENDER ALL ───────────────────────────────────────────
+function renderAll(){
+  renderTrades(); renderWorkflow(); renderWheels();
+}
+</script>
+</body>
+</html>
