@@ -2008,7 +2008,8 @@
   ],
   "colWidths": {
     "Symbol": 260,
-    "β Delta": 57
+    "β Delta": 57,
+    "/ Delta": 68
   },
   "colHidden": {
     "Sector": true,
@@ -2017,5 +2018,5 @@
     "P/L YTD": true
   },
   "posImportDate": "3/18/2026, 7:34:11 AM",
-  "updated": "2026-03-18T17:46:52.678Z"
+  "updated": "2026-03-18T17:46:55.754Z"
 }
