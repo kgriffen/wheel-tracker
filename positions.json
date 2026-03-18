@@ -1951,6 +1951,11 @@
           "field": "pop",
           "op": "<",
           "value": "65"
+        },
+        {
+          "field": "itm_otm",
+          "op": "=",
+          "value": "ITM"
         }
       ]
     },
@@ -1984,5 +1989,5 @@
     "P/L YTD": true
   },
   "posImportDate": "3/18/2026, 10:47:53 AM",
-  "updated": "2026-03-18T17:48:07.507Z"
+  "updated": "2026-03-18T17:49:21.095Z"
 }
