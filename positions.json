@@ -1960,9 +1960,19 @@
       "color": "#185FA5",
       "conditions": [
         {
-          "field": "pop",
-          "op": ">=",
-          "value": "65"
+          "field": "itm_otm",
+          "op": "=",
+          "value": "OTM"
+        },
+        {
+          "field": "pl_pct",
+          "op": ">",
+          "value": "-200"
+        },
+        {
+          "field": "pl_pct",
+          "op": "<=",
+          "value": "50"
         }
       ]
     }
@@ -1979,5 +1989,5 @@
     "P/L YTD": true
   },
   "posImportDate": "3/18/2026, 10:47:53 AM",
-  "updated": "2026-03-18T17:52:57.055Z"
+  "updated": "2026-03-18T17:53:46.719Z"
 }
