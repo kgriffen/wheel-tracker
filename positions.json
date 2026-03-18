@@ -2012,8 +2012,9 @@
   "colHidden": {
     "Sector": true,
     "Industry": true,
-    "Ext RoR %": true
+    "Ext RoR %": true,
+    "P/L YTD": true
   },
   "posImportDate": "3/18/2026, 7:34:11 AM",
-  "updated": "2026-03-18T17:46:39.141Z"
+  "updated": "2026-03-18T17:46:43.691Z"
 }
