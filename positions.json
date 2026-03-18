@@ -1941,6 +1941,18 @@
   ],
   "buckets": [
     {
+      "id": "b-urgent",
+      "name": "Urgent",
+      "color": "#D85A30",
+      "conditions": [
+        {
+          "field": "pl_pct",
+          "op": ">",
+          "value": "200"
+        }
+      ]
+    },
+    {
       "id": "b-take-profits",
       "name": "Take Profits",
       "color": "#7F77DD",
@@ -1961,18 +1973,6 @@
           "field": "early_profit",
           "op": "=",
           "value": "true"
-        }
-      ]
-    },
-    {
-      "id": "b-urgent",
-      "name": "Urgent",
-      "color": "#D85A30",
-      "conditions": [
-        {
-          "field": "pl_pct",
-          "op": ">",
-          "value": "200"
         }
       ]
     },
@@ -2011,5 +2011,5 @@
   },
   "colHidden": {},
   "posImportDate": "3/18/2026, 7:34:11 AM",
-  "updated": "2026-03-18T14:44:35.711Z"
+  "updated": "2026-03-18T14:44:43.681Z"
 }
