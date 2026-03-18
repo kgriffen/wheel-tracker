@@ -1955,7 +1955,7 @@
         {
           "field": "itm_otm",
           "op": "=",
-          "value": "ITM"
+          "value": "ATM"
         }
       ]
     },
@@ -1984,5 +1984,5 @@
     "P/L YTD": true
   },
   "posImportDate": "3/18/2026, 10:47:53 AM",
-  "updated": "2026-03-18T17:49:38.675Z"
+  "updated": "2026-03-18T17:51:21.924Z"
 }
