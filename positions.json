@@ -1987,18 +1987,6 @@
       ]
     },
     {
-      "id": "b-early-close",
-      "name": "Early Close Rule",
-      "color": "#1D9E75",
-      "conditions": [
-        {
-          "field": "early_profit",
-          "op": "=",
-          "value": "true"
-        }
-      ]
-    },
-    {
       "id": "b-urgent",
       "name": "Urgent",
       "color": "#D85A30",
@@ -2076,5 +2064,5 @@
   ],
   "wfColWidths": {},
   "wfColHidden": {},
-  "updated": "2026-03-19T20:20:40.191Z"
+  "updated": "2026-03-19T20:21:41.352Z"
 }
