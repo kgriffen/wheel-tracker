@@ -1999,18 +1999,6 @@
       ]
     },
     {
-      "id": "b-warning",
-      "name": "Warning",
-      "color": "#EF9F27",
-      "conditions": [
-        {
-          "field": "pae_pct",
-          "op": "<",
-          "value": "100"
-        }
-      ]
-    },
-    {
       "id": "b-1773952067389",
       "name": "Take Profit Early",
       "color": "#1D9E75",
@@ -2024,6 +2012,18 @@
           "field": "pae_pct",
           "op": ">=",
           "value": "0"
+        }
+      ]
+    },
+    {
+      "id": "b-warning",
+      "name": "Warning",
+      "color": "#EF9F27",
+      "conditions": [
+        {
+          "field": "pae_pct",
+          "op": "<",
+          "value": "100"
         }
       ]
     },
@@ -2081,5 +2081,5 @@
   ],
   "wfColWidths": {},
   "wfColHidden": {},
-  "updated": "2026-03-19T20:27:51.026Z"
+  "updated": "2026-03-19T20:27:53.908Z"
 }
