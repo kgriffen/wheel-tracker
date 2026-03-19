@@ -1975,6 +1975,18 @@
   ],
   "buckets": [
     {
+      "id": "b-take-profits",
+      "name": "Take Profits",
+      "color": "#7F77DD",
+      "conditions": [
+        {
+          "field": "pl_pct",
+          "op": ">=",
+          "value": "50"
+        }
+      ]
+    },
+    {
       "id": "b-1773952067389",
       "name": "Take Profit Early",
       "color": "#1D9E75",
@@ -1987,19 +1999,7 @@
         {
           "field": "pae_pct",
           "op": ">=",
-          "value": "0"
-        }
-      ]
-    },
-    {
-      "id": "b-take-profits",
-      "name": "Take Profits",
-      "color": "#7F77DD",
-      "conditions": [
-        {
-          "field": "pl_pct",
-          "op": ">=",
-          "value": "50"
+          "value": "100"
         }
       ]
     },
@@ -2081,5 +2081,5 @@
   ],
   "wfColWidths": {},
   "wfColHidden": {},
-  "updated": "2026-03-19T20:27:58.258Z"
+  "updated": "2026-03-19T20:28:47.541Z"
 }
