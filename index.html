@@ -1677,7 +1677,7 @@ function renderWorkflow(){
         ${pop!==null?`<div class="wf-bmi"><div class="wf-bml">Avg PoP</div><div class="wf-bmv ${pop>=65?'cg':pop>=50?'ca':'cr'}">${pop}%</div></div>`:''}
       </div>`:''}
       <div class="wf-bbody ${list.length?'open':''}">
-        ${(bucketItems[b.id]||[]).length?renderWFTable(bktLegs,b.id):'<div style="padding:10px 13px;font-size:12px;color:var(--tx3)">No positions match.</div>'}
+        ${(bucketItems[b.id]||[]).length?renderWFTable(bucketItems[b.id],b.id,b):'<div style="padding:10px 13px;font-size:12px;color:var(--tx3)">No positions match.</div>'}
       </div>
     </div>`;
   }).join('');
@@ -1689,7 +1689,7 @@ function renderWorkflow(){
         <div class="wf-bname">Uncategorized</div>
         <div class="wf-bcnt">${uncatItems.length}</div>
       </div>
-      <div class="wf-bbody open">${renderWFTable(uncategorized,'uncat')}</div>
+      <div class="wf-bbody open">${renderWFTable(uncatItems,'uncat',null)}</div>
     </div>`;
   } else { wfUncat.innerHTML=''; }
 }
@@ -1784,16 +1784,24 @@ function wfSortVal(p, colKey){
   return String(val||'').toLowerCase();
 }
 
-function renderWFTable(list, bucketId){
-  // Ensure all WF_COLS keys are in wfColOrder (adds newly introduced columns)
+function renderWFTable(itemsOrLegs, bucketId, currentBucket){
   if(!wfColOrder.length) wfColOrder=WF_COLS.map(c=>c.key);
   else { WF_COLS.forEach(c=>{ if(!wfColOrder.includes(c.key)) wfColOrder.push(c.key); }); }
+
+  // Accept either items array or flat positions — normalize to items
+  const items = (itemsOrLegs.length && itemsOrLegs[0].isSpread !== undefined)
+    ? itemsOrLegs
+    : buildDisplayItems(itemsOrLegs);
+
   const ss=wfSortState[bucketId]||{col:'',asc:true};
-  const sorted=ss.col?[...list].sort((a,b)=>{
-    const av=wfSortVal(a,ss.col), bv=wfSortVal(b,ss.col);
+  // Sort by first leg's sort value for now
+  const sortedItems=ss.col?[...items].sort((a,b)=>{
+    const pa=a.isSpread?a.legs[0]:a.position;
+    const pb=b.isSpread?b.legs[0]:b.position;
+    const av=wfSortVal(pa,ss.col), bv=wfSortVal(pb,ss.col);
     if(av===null) return 1; if(bv===null) return -1;
     return (av<bv?-1:av>bv?1:0)*(ss.asc?1:-1);
-  }):[...list];
+  }):[...items];
 
   const cols=wfColOrder.map(k=>WF_COLS.find(c=>c.key===k)).filter(c=>c&&!wfColHidden[c.key]);
 
@@ -1815,23 +1823,70 @@ function renderWFTable(list, bucketId){
     </th>`;
   }).join('');
 
-  const tbody=sorted.map(p=>{
-    const derived=deriveFields(p);
-    const cells=cols.map(col=>{
-      const w=wfColWidths[col.key]||col.width;
-      const style=`width:${w}px;min-width:${w}px;max-width:${w}px`;
-      const val=col.key==='_bucket'?'__wfbucket__':
-                col.key==='_type'?'__type__':
-                col.key==='_pae'?'__pae__':
-                col.key==='_pae_pct'?'__pae_pct__':
-                col.key==='_ann_yield'?'__ann_yield__':
-                col.key==='_capital'?'__capital__':
-                p[col.key];
-      const html=fmtWFCell(col,val,derived,p);
-      const align=['money','pl-money','pl-pct','pop','num1','num2','price2','price4','qty','dte','days'].includes(col.fmt)?'text-align:right':'';
-      return `<td style="${style};${align};padding:6px 8px;border-bottom:1px solid var(--bdr);border-right:1px solid var(--bdr);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;vertical-align:middle;font-size:12px">${html}</td>`;
-    }).join('');
-    return `<tr style="cursor:default" onmouseover="this.style.background='#FAFAF7'" onmouseout="this.style.background=''">${cells}</tr>`;
+  const TD = (style,align,html) =>
+    `<td style="${style};${align?'text-align:right':''};padding:6px 8px;border-bottom:1px solid var(--bdr);border-right:1px solid var(--bdr);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;vertical-align:middle;font-size:12px">${html}</td>`;
+
+  const ALIGNS = new Set(['money','pl-money','pl-pct','pop','num1','num2','price2','price4','qty','dte','days']);
+
+  const tbody = sortedItems.map((item, iidx) => {
+    if(item.isSpread) {
+      const agg = spreadAggregate(item.legs);
+      const sid = `wfs-${bucketId}-${iidx}`;
+      const plCls = agg.totalPLOpen>=0?'cg':'cr';
+      const paePctCls = agg.paePct>=100?'cg':agg.paePct>=1?'ca':'cr';
+
+      const parentCells = cols.map(col => {
+        const w = wfColWidths[col.key]||col.width;
+        const s = `width:${w}px;min-width:${w}px;max-width:${w}px`;
+        const align = ALIGNS.has(col.fmt);
+        if(col.key==='Symbol') return TD(s,false,
+          `<span class="wf-spread-toggle" onclick="toggleWFSpread('${sid}')" style="cursor:pointer;margin-right:4px;color:var(--tx3);font-size:10px;user-select:none">▶</span><strong style="font-size:11px">${item.underlying}</strong><span style="font-size:9px;color:var(--tx3);margin-left:4px">${item.legs.length} legs</span>`);
+        if(col.key==='_bucket') return TD(s,false, currentBucket?bucketTag(currentBucket):'<span style="color:var(--tx3)">—</span>');
+        if(col.key==='_type') return TD(s,false, strategyTag(item.type));
+        if(col.key==='Call/Put'||col.key==='Strike Price') return TD(s,true,'<span style="color:var(--tx3)">—</span>');
+        if(col.key==='Quantity') return TD(s,true,`<span class="mono">${item.legs.reduce((s,l)=>s+Math.abs(parseInt(l['Quantity']||0)),0)}</span>`);
+        if(col.key==='DTE') return TD(s,true,`<span class="mono${agg.minDTE<=7?' cr':agg.minDTE<=14?' ca':''}">${agg.minDTE<999?agg.minDTE+'d':'—'}</span>`);
+        if(col.key==='Cost') return TD(s,true,`<span class="mono ${agg.totalCost>=0?'cg':'cr'}">${agg.totalCost>=0?'$':'-$'}${Math.abs(agg.totalCost).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}</span>`);
+        if(col.key==='P/L Open') return TD(s,true,`<span class="mono ${plCls}">${agg.totalPLOpen>=0?'+$':'-$'}${Math.abs(agg.totalPLOpen).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}</span>`);
+        if(col.key==='P/L Opn%') return TD(s,true,`<span class="mono ${plCls}">${agg.plPct!==null?agg.plPct.toFixed(1)+'%':'—'}</span>`);
+        if(col.key==='PoP') return TD(s,true,`<span class="mono ${agg.avgPoP>=65?'cg':agg.avgPoP>=50?'ca':'cr'}" style="font-weight:500">${agg.avgPoP!==null?agg.avgPoP+'%':'—'}</span>`);
+        if(col.key==='_pae') return TD(s,true,`<span class="mono ${agg.pae>=0?'cg':'cr'}">${agg.pae!==null?(agg.pae>=0?'+$':'-$')+Math.abs(agg.pae).toFixed(2):'—'}</span>`);
+        if(col.key==='_pae_pct') return TD(s,true,`<span class="mono ${paePctCls}" style="font-weight:500">${agg.paePct!==null?agg.paePct.toFixed(1)+'%':'—'}</span>`);
+        return TD(s,align,'');
+      }).join('');
+
+      const legRows = item.legs.map(leg => {
+        const derived = deriveFields(leg);
+        const legCells = cols.map(col => {
+          const w = wfColWidths[col.key]||col.width;
+          const s = `width:${w}px;min-width:${w}px;max-width:${w}px`;
+          const align = ALIGNS.has(col.fmt);
+          if(col.key==='Symbol') return TD(s,false,
+            `<span style="color:var(--tx3);margin-right:3px;font-size:10px;padding-left:14px">└</span><span style="font-size:11px">${fmtSymbol(leg['Symbol'])}</span>`);
+          if(col.key==='_bucket'||col.key==='_type') return TD(s,false,'');
+          const val = col.key==='_pae'?'__pae__':col.key==='_pae_pct'?'__pae_pct__':col.key==='_ann_yield'?'__ann_yield__':col.key==='_capital'?'__capital__':leg[col.key];
+          return TD(s,align, fmtWFCell(col,val,derived,leg));
+        }).join('');
+        return `<tr class="wf-spread-leg" data-wsid="${sid}" style="display:none;background:#FAFDF8" onmouseover="this.style.background='#F3FBF5'" onmouseout="this.style.background='#FAFDF8'">${legCells}</tr>`;
+      }).join('');
+
+      return `<tr class="wf-spread-parent" data-wsid="${sid}" style="background:var(--surf2)" onmouseover="this.style.background='#EFEEE8'" onmouseout="this.style.background='var(--surf2)'">${parentCells}</tr>${legRows}`;
+    } else {
+      // Single position
+      const p = item.position;
+      const derived = deriveFields(p);
+      const cells = cols.map(col => {
+        const w = wfColWidths[col.key]||col.width;
+        const s = `width:${w}px;min-width:${w}px;max-width:${w}px`;
+        const align = ALIGNS.has(col.fmt);
+        // Bucket column: show currentBucket (where it actually sits), not re-evaluated
+        if(col.key==='_bucket') return TD(s,false, currentBucket?bucketTag(currentBucket):'<span style="color:var(--tx3)">—</span>');
+        if(col.key==='_type') return TD(s,false, strategyTag(item.type));
+        const val = col.key==='_pae'?'__pae__':col.key==='_pae_pct'?'__pae_pct__':col.key==='_ann_yield'?'__ann_yield__':col.key==='_capital'?'__capital__':p[col.key];
+        return TD(s,align, fmtWFCell(col,val,derived,p));
+      }).join('');
+      return `<tr style="cursor:default" onmouseover="this.style.background='#FAFAF7'" onmouseout="this.style.background=''">${cells}</tr>`;
+    }
   }).join('');
 
   return `<div style="overflow-x:auto">
@@ -1840,6 +1895,15 @@ function renderWFTable(list, bucketId){
       <tbody>${tbody}</tbody>
     </table>
   </div>`;
+}
+
+function toggleWFSpread(sid){
+  const legs=document.querySelectorAll(`.wf-spread-leg[data-wsid="${sid}"]`);
+  const parent=document.querySelector(`.wf-spread-parent[data-wsid="${sid}"]`);
+  const toggle=parent?.querySelector('.wf-spread-toggle');
+  const expanded=legs[0]?.style.display!=='none';
+  legs.forEach(l=>l.style.display=expanded?'none':'');
+  if(toggle) toggle.textContent=expanded?'▶':'▼';
 }
 
 function fmtWFCell(col, val, derived, pos){
