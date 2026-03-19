@@ -1839,18 +1839,6 @@
   ],
   "buckets": [
     {
-      "id": "b-urgent",
-      "name": "Urgent",
-      "color": "#D85A30",
-      "conditions": [
-        {
-          "field": "pl_pct",
-          "op": "<",
-          "value": "-200"
-        }
-      ]
-    },
-    {
       "id": "b-take-profits",
       "name": "Take Profits",
       "color": "#7F77DD",
@@ -1859,6 +1847,18 @@
           "field": "pl_pct",
           "op": ">=",
           "value": "50"
+        }
+      ]
+    },
+    {
+      "id": "b-urgent",
+      "name": "Urgent",
+      "color": "#D85A30",
+      "conditions": [
+        {
+          "field": "pl_pct",
+          "op": "<",
+          "value": "-200"
         }
       ]
     },
@@ -1950,5 +1950,5 @@
   ],
   "wfColWidths": {},
   "wfColHidden": {},
-  "updated": "2026-03-19T15:15:55.755Z"
+  "updated": "2026-03-19T15:16:54.816Z"
 }
