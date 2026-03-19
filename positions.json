@@ -1892,19 +1892,9 @@
       "color": "#185FA5",
       "conditions": [
         {
-          "field": "itm_otm",
-          "op": "=",
-          "value": "OTM"
-        },
-        {
-          "field": "pl_pct",
-          "op": ">",
-          "value": "-200"
-        },
-        {
-          "field": "pl_pct",
-          "op": "<=",
-          "value": "50"
+          "field": "pae_pct",
+          "op": ">=",
+          "value": "0"
         }
       ]
     }
@@ -1950,5 +1940,5 @@
   ],
   "wfColWidths": {},
   "wfColHidden": {},
-  "updated": "2026-03-19T15:17:58.522Z"
+  "updated": "2026-03-19T15:18:26.210Z"
 }
