@@ -2021,6 +2021,23 @@
           "value": "0"
         }
       ]
+    },
+    {
+      "id": "b-1773952067389",
+      "name": "Take Profit Early",
+      "color": "#1D9E75",
+      "conditions": [
+        {
+          "field": "early_profit",
+          "op": "=",
+          "value": "true"
+        },
+        {
+          "field": "pae_pct",
+          "op": ">=",
+          "value": "0"
+        }
+      ]
     }
   ],
   "colWidths": {
@@ -2064,5 +2081,5 @@
   ],
   "wfColWidths": {},
   "wfColHidden": {},
-  "updated": "2026-03-19T20:21:41.352Z"
+  "updated": "2026-03-19T20:27:47.389Z"
 }
