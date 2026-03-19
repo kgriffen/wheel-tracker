@@ -467,6 +467,7 @@ const ALL_COLS = [
   {key:'_cb',       label:'',          width:28,  sortable:false, fixed:true},
   {key:'Symbol',    label:'Symbol',    width:160, sortable:true,  fmt:'symbol'},
   {key:'_bucket',   label:'Bucket',    width:110, sortable:true,  fmt:'bucket'},
+  {key:'_type',     label:'Type',      width:145, sortable:true,  fmt:'strategy-tag'},
   {key:'Type',      label:'Type',      width:80,  sortable:true,  fmt:'type-badge'},
   {key:'Call/Put',  label:'C/P',       width:44,  sortable:true,  fmt:'cp-badge'},
   {key:'Quantity',  label:'Qty',       width:44,  sortable:true,  fmt:'qty'},
@@ -478,6 +479,8 @@ const ALL_COLS = [
   {key:'Mark',      label:'Mark',      width:68,  sortable:true,  fmt:'price4'},
   {key:'Cost',      label:'Cost',      width:75,  sortable:true,  fmt:'money'},
   {key:'Ext',       label:'Ext Val',   width:75,  sortable:true,  fmt:'money'},
+  {key:'_ann_yield',label:'Ann Yield', width:70,  sortable:true,  fmt:'ann-yield'},
+  {key:'_capital',  label:'Capital',   width:80,  sortable:true,  fmt:'money'},
   {key:'P/L Open',  label:'P/L $',     width:75,  sortable:true,  fmt:'pl-money'},
   {key:'P/L Opn%',  label:'P/L %',     width:60,  sortable:true,  fmt:'pl-pct'},
   {key:'_pae',      label:'PAE $',      width:75,  sortable:true,  fmt:'pae-money'},
@@ -677,7 +680,23 @@ function deriveFields(p){
     paePct=Math.round((pae/cost)*1000)/10;
   }
 
-  return {itmOtm,strikeDist,earlyProfit,pae,paePct,
+  // Ann Yield: (Cost / (DTE + DaysOpn)) * (365 / Cost) = 365 / (DTE + DaysOpn) — simplified
+  // More correct: (Cost / Strike*100*|qty|) * (365 / (DTE+DaysOpn)) * 100
+  let _annYield = null;
+  if(cost && cost > 0 && dte !== null && daysOpn !== null && (dte + daysOpn) > 0 && strike && qty) {
+    const capital = Math.abs(strike) * 100 * Math.abs(qty);
+    if(capital > 0) _annYield = Math.round((cost / capital) * (365 / (dte + daysOpn)) * 100 * 10) / 10;
+  }
+
+  // Capital used: strike * 100 * |qty| for equity options
+  const _capital = (strike && qty && (p['Type']||'') !== 'FUTURES_OPTION')
+    ? Math.abs(strike) * 100 * Math.abs(qty)
+    : null;
+
+  // Strategy type for single positions (spread type set at render time)
+  const _stratType = classifyLegs([p]);
+
+  return {itmOtm,strikeDist,earlyProfit,pae,paePct,_annYield,_capital,_stratType,
     _dte:dte,_daysOpn:daysOpn,_plOpen:plOpen,_plPct:plPct,_cost:cost,_pop:pop,_qty:qty,_strike:strike,_last:last};
 }
 
@@ -831,6 +850,21 @@ function fmtCell(col,val,derived,pos){
       if(!bucket) return '<span style="color:var(--tx3);font-size:11px">—</span>';
       return `<span style="font-size:10px;padding:2px 7px;border-radius:8px;font-weight:500;white-space:nowrap;background:${hexToRgba(bucket.color,0.13)};color:${bucket.color};border:1px solid ${hexToRgba(bucket.color,0.28)}">${bucket.name}</span>`;
     }
+    case 'strategy-tag':{
+      // val is sentinel '__type__', actual type from derived
+      if(val==='__type__') return derived?._stratType?strategyTag(derived._stratType):'<span style="color:var(--tx3)">—</span>';
+      // Also handle when called directly with a type string (WF table)
+      return strategyTag(String(val));
+    }
+    case 'ann-yield':{
+      if(val==='__ann_yield__'){
+        const n=derived?._annYield;
+        if(n===null||n===undefined) return '<span style="color:var(--tx3)">—</span>';
+        const cls=n>=20?'cg':n>=10?'ca':'';
+        return `<span class="mono ${cls}">${n.toFixed(1)}%</span>`;
+      }
+      return '<span style="color:var(--tx3)">—</span>';
+    }
     case 'pae-money':{
       if(val==='__pae__'){
         if(derived?.pae===null||derived?.pae===undefined) return '<span style="color:var(--tx3)">—</span>';
@@ -850,7 +884,18 @@ function fmtCell(col,val,derived,pos){
       }
       return '<span style="color:var(--tx3)">—</span>';
     }
+    case 'capital':{
+      const n=cleanNum(val);
+      if(n===null) return '<span style="color:var(--tx3)">—</span>';
+      return `<span class="mono">$${n.toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:0})}</span>`;
+    }
     default:
+      // Handle __capital__ sentinel
+      if(val==='__capital__'){
+        const n=derived?._capital;
+        if(n===null||n===undefined) return '<span style="color:var(--tx3)">—</span>';
+        return `<span class="mono">$${n.toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:0})}</span>`;
+      }
       return `<span style="font-size:12px">${val}</span>`;
   }
 }
@@ -884,9 +929,13 @@ function getFilteredPositions(){
 }
 
 function sortVal(p,colKey){
-  if(colKey==='_pae'||colKey==='_pae_pct'){
+  if(colKey==='_pae'||colKey==='_pae_pct'||colKey==='_ann_yield'||colKey==='_capital'||colKey==='_type'){
     const d=deriveFields(p);
-    return colKey==='_pae'?d.pae:d.paePct;
+    if(colKey==='_pae') return d.pae;
+    if(colKey==='_pae_pct') return d.paePct;
+    if(colKey==='_ann_yield') return d._annYield;
+    if(colKey==='_capital') return d._capital;
+    if(colKey==='_type') return d._stratType||'';
   }
   if(colKey==='_bucket'){
     const b=getBucketForPosition(p);
@@ -923,16 +972,31 @@ function renderPositions(){
 
 function renderPosStats(list){
   const all=list.length?list:positions;
-  const shortCount=all.filter(p=>cleanNum(p['Quantity'])<0).length;
-  const totalCost=all.reduce((s,p)=>{const n=cleanNum(p['Cost']);return s+(n&&cleanNum(p['Quantity'])<0?n:0);},0);
-  const totalPL=all.reduce((s,p)=>{const n=cleanNum(p['P/L Open']);return s+(n||0);},0);
+  const shorts=all.filter(p=>cleanNum(p['Quantity'])<0);
+  const totalCost=shorts.reduce((s,p)=>s+(cleanNum(p['Cost'])||0),0);
+  const totalPL=all.reduce((s,p)=>s+(cleanNum(p['P/L Open'])||0),0);
+  const totalCapital=shorts.reduce((s,p)=>{
+    const str=cleanNum(p['Strike Price']),qty=Math.abs(cleanNum(p['Quantity'])||0);
+    return s+(str&&p['Type']!=='FUTURES_OPTION'?str*100*qty:0);
+  },0);
+  const annYield=totalCapital>0?Math.round((totalCost/totalCapital)*365/45*100*10)/10:null; // ~45d avg assumption
+  // Weighted ann yield: sum of individual
+  let wAnnYield=null;
+  const yieldSamples=shorts.map(p=>{
+    const d=deriveFields(p);
+    return d._annYield;
+  }).filter(n=>n!==null);
+  if(yieldSamples.length) wAnnYield=Math.round(yieldSamples.reduce((s,n)=>s+n,0)/yieldSamples.length*10)/10;
+
   const avgPop=()=>{const ps=all.filter(p=>cleanNum(p['PoP'])!=null);return ps.length?Math.round(ps.reduce((s,p)=>s+(cleanNum(p['PoP'])||0),0)/ps.length):null;};
   const itmCount=all.filter(p=>deriveFields(p).itmOtm==='ITM').length;
   const earlyClose=all.filter(p=>deriveFields(p).earlyProfit).length;
   const pop=avgPop();
   document.getElementById('pos-stats').innerHTML=`
-    <div class="stat"><div class="sl">Positions</div><div class="sv">${shortCount} <span style="font-size:13px;color:var(--tx3)">short</span></div></div>
-    <div class="stat"><div class="sl">Total premium</div><div class="sv" style="font-size:16px">${fmt$(totalCost)}</div></div>
+    <div class="stat"><div class="sl">Positions</div><div class="sv">${shorts.length} <span style="font-size:13px;color:var(--tx3)">short</span></div><div class="ss">${all.length} total</div></div>
+    <div class="stat"><div class="sl">Total premium</div><div class="sv cg" style="font-size:16px">${fmt$(totalCost)}</div></div>
+    <div class="stat"><div class="sl">Capital used</div><div class="sv" style="font-size:15px">$${totalCapital>0?Math.round(totalCapital/1000)+'k':'—'}</div></div>
+    <div class="stat"><div class="sl">Avg ann yield</div><div class="sv ${wAnnYield>=20?'cg':wAnnYield>=10?'ca':''}">${wAnnYield!==null?wAnnYield+'%':'—'}</div></div>
     <div class="stat"><div class="sl">P/L Open</div><div class="sv ${totalPL>=0?'cg':'cr'}" style="font-size:16px">${fmt$(totalPL,true)}</div></div>
     <div class="stat"><div class="sl">Avg PoP</div><div class="sv ${pop>=65?'cg':pop>=50?'ca':'cr'}">${pop!==null?pop+'%':'—'}</div></div>
     <div class="stat"><div class="sl">ITM</div><div class="sv ${itmCount>0?'cr':'cg'}">${itmCount}</div><div class="ss">of ${all.length}</div></div>
@@ -1019,28 +1083,101 @@ function renderPosHeader(){
 function renderPosBody(list){
   const tbody=document.getElementById('pos-tbody');
   const cols=colOrder.map(k=>ALL_COLS.find(c=>c.key===k)).filter(Boolean).filter(c=>c.fixed||!colHidden[c.key]);
-  tbody.innerHTML=list.map((p,ri)=>{
-    const derived=deriveFields(p);
-    const sel=selectedIdx.has(ri);
-    const cells=cols.map(col=>{
-      const w=colWidths[col.key]||col.width;
-      const style=`width:${w}px;min-width:${w}px;max-width:${w}px`;
-      if(col.key==='_cb'){
-        return `<td class="cb-col" data-col="_cb" style="${style}"><input type="checkbox" class="row-cb" data-ri="${ri}" ${sel?'checked':''} onchange="onRowCheck(this)"></td>`;
-      }
-      if(col.key==='_actions'){
-        return `<td data-col="_actions" style="${style};text-align:center"><button class="btn btn-sm" style="padding:2px 7px;font-size:11px" onclick="openEdit(${ri})">Edit</button></td>`;
-      }
-      const val=col.key==='_bucket'?'__bucket__':
-                col.key==='_pae'?'__pae__':
-                col.key==='_pae_pct'?'__pae_pct__':
-                p[col.key];
-      const html=fmtCell(col,val,derived,p);
-      const align=['money','pl-money','pl-pct','pop','num1','num2','num3','pct','pct-chg','price2','price4','qty','dte','days'].includes(col.fmt)?'text-align:right':'';
-      return `<td data-col="${col.key}" style="${style};${align}" title="${String(val||'').replace(/"/g,'&quot;')}">${html}</td>`;
-    }).join('');
-    return `<tr data-ri="${ri}" class="${sel?'selected':''}">${cells}</tr>`;
-  }).join('');
+  const items=buildDisplayItems(list);
+  const rows=[];
+
+  items.forEach((item, itemIdx) => {
+    if(!item.isSpread){
+      // Single position row
+      const p=item.position;
+      const ri=list.indexOf(p);
+      const derived=Object.assign({},deriveFields(p),{_stratType:item.type});
+      const bucket=getBucketForItem(item);
+      const sel=selectedIdx.has(ri);
+      const cells=cols.map(col=>{
+        const w=colWidths[col.key]||col.width;
+        const style=`width:${w}px;min-width:${w}px;max-width:${w}px`;
+        if(col.key==='_cb') return `<td class="cb-col" data-col="_cb" style="${style}"><input type="checkbox" class="row-cb" data-ri="${ri}" ${sel?'checked':''} onchange="onRowCheck(this)"></td>`;
+        if(col.key==='_actions') return `<td data-col="_actions" style="${style};text-align:center"><button class="btn btn-sm" style="padding:2px 7px;font-size:11px" onclick="openEdit(${ri})">Edit</button></td>`;
+        const val=col.key==='_bucket'?'__bucket__':col.key==='_type'?'__type__':col.key==='_pae'?'__pae__':col.key==='_pae_pct'?'__pae_pct__':col.key==='_ann_yield'?'__ann_yield__':col.key==='_capital'?'__capital__':p[col.key];
+        // Override bucket rendering with item's bucket
+        if(col.key==='_bucket') return `<td data-col="${col.key}" style="${style}">${bucketTag(bucket)}</td>`;
+        const html=fmtCell(col,val,derived,p);
+        const align=['money','pl-money','pl-pct','pop','num1','num2','num3','pct','pct-chg','price2','price4','qty','dte','days'].includes(col.fmt)?'text-align:right':'';
+        return `<td data-col="${col.key}" style="${style};${align}" title="${String(val||'').replace(/"/g,'&quot;')}">${html}</td>`;
+      }).join('');
+      rows.push(`<tr data-ri="${ri}" class="${sel?'selected':''}">${cells}</tr>`);
+    } else {
+      // Spread parent row (collapsed by default, expandable)
+      const agg=spreadAggregate(item.legs);
+      const bucket=getBucketForItem(item);
+      const spreadId=`spread-${itemIdx}`;
+      const plCls=agg.totalPLOpen>=0?'cg':'cr';
+      const plPctCls=agg.plPct>=0?'cg':'cr';
+      const popCls=agg.avgPoP>=65?'cg':agg.avgPoP>=50?'ca':'cr';
+      const paeCls=agg.pae>=0?'cg':'cr';
+      const paePctCls=agg.paePct>=100?'cg':agg.paePct>=1?'ca':'cr';
+      
+      // Build parent cells
+      const parentCells=cols.map(col=>{
+        const w=colWidths[col.key]||col.width;
+        const style=`width:${w}px;min-width:${w}px;max-width:${w}px`;
+        if(col.key==='_cb') return `<td class="cb-col" data-col="_cb" style="${style}"></td>`;
+        if(col.key==='_actions') return `<td data-col="_actions" style="${style}"></td>`;
+        if(col.key==='Symbol') return `<td data-col="Symbol" style="${style}">
+          <span class="spread-toggle" onclick="toggleSpread('${spreadId}')" style="cursor:pointer;margin-right:4px;font-size:11px;color:var(--tx3)">▶</span>
+          <strong style="font-size:11px">${item.underlying}</strong>
+          <span style="font-size:9px;color:var(--tx3);margin-left:4px">${item.legs.length} legs</span>
+        </td>`;
+        if(col.key==='_bucket') return `<td data-col="_bucket" style="${style}">${bucketTag(bucket)}</td>`;
+        if(col.key==='_type') return `<td data-col="_type" style="${style}">${strategyTag(item.type)}</td>`;
+        if(col.key==='Call/Put') return `<td style="${style}"><span style="font-size:11px;color:var(--tx3)">—</span></td>`;
+        if(col.key==='Strike Price') return `<td style="${style}"><span style="font-size:11px;color:var(--tx3)">—</span></td>`;
+        if(col.key==='Quantity') return `<td style="${style};text-align:right"><span class="mono">${item.legs.reduce((s,l)=>s+Math.abs(parseInt(l['Quantity']||0)),0)}</span></td>`;
+        if(col.key==='DTE') return `<td style="${style};text-align:right"><span class="mono${agg.minDTE<=7?' cr':agg.minDTE<=14?' ca':''}">${agg.minDTE<999?agg.minDTE+'d':'—'}</span></td>`;
+        if(col.key==='Cost') return `<td style="${style};text-align:right"><span class="mono ${agg.totalCost>=0?'cg':'cr'}">${agg.totalCost>=0?'$':'-$'}${Math.abs(agg.totalCost).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}</span></td>`;
+        if(col.key==='P/L Open') return `<td style="${style};text-align:right"><span class="mono ${plCls}">${agg.totalPLOpen>=0?'+$':'-$'}${Math.abs(agg.totalPLOpen).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}</span></td>`;
+        if(col.key==='P/L Opn%') return `<td style="${style};text-align:right"><span class="mono ${plPctCls}">${agg.plPct!==null?agg.plPct.toFixed(1)+'%':'—'}</span></td>`;
+        if(col.key==='PoP') return `<td style="${style};text-align:right"><span class="mono ${popCls}" style="font-weight:500">${agg.avgPoP!==null?agg.avgPoP+'%':'—'}</span></td>`;
+        if(col.key==='_pae') return `<td style="${style};text-align:right"><span class="mono ${paeCls}">${agg.pae!==null?(agg.pae>=0?'+$':'-$')+Math.abs(agg.pae).toFixed(2):'—'}</span></td>`;
+        if(col.key==='_pae_pct') return `<td style="${style};text-align:right"><span class="mono ${paePctCls}" style="font-weight:500">${agg.paePct!==null?agg.paePct.toFixed(1)+'%':'—'}</span></td>`;
+        return `<td style="${style}"></td>`;
+      }).join('');
+
+      rows.push(`<tr class="spread-parent" data-spread="${spreadId}" style="background:var(--surf2)">${parentCells}</tr>`);
+
+      // Leg rows (hidden by default)
+      item.legs.forEach((p, li) => {
+        const ri=list.indexOf(p);
+        const derived=deriveFields(p);
+        const legCells=cols.map(col=>{
+          const w=colWidths[col.key]||col.width;
+          const style=`width:${w}px;min-width:${w}px;max-width:${w}px`;
+          if(col.key==='_cb') return `<td class="cb-col" data-col="_cb" style="${style}"><input type="checkbox" class="row-cb" data-ri="${ri}" onchange="onRowCheck(this)"></td>`;
+          if(col.key==='_actions') return `<td data-col="_actions" style="${style};text-align:center"><button class="btn btn-sm" style="padding:2px 7px;font-size:11px" onclick="openEdit(${ri})">Edit</button></td>`;
+          if(col.key==='Symbol') return `<td data-col="Symbol" style="${style};padding-left:28px"><span style="font-size:11px;color:var(--tx3)">└</span> <span style="font-size:11px">${fmtSymbol(p['Symbol'])}</span></td>`;
+          if(col.key==='_bucket') return `<td style="${style}"></td>`;
+          if(col.key==='_type') return `<td style="${style}"></td>`;
+          const val=col.key==='_pae'?'__pae__':col.key==='_pae_pct'?'__pae_pct__':col.key==='_ann_yield'?'__ann_yield__':col.key==='_capital'?'__capital__':p[col.key];
+          const html=fmtCell(col,val,derived,p);
+          const align=['money','pl-money','pl-pct','pop','num1','num2','num3','pct','pct-chg','price2','price4','qty','dte','days'].includes(col.fmt)?'text-align:right':'';
+          return `<td data-col="${col.key}" style="${style};${align}">${html}</td>`;
+        }).join('');
+        rows.push(`<tr class="spread-leg" data-spread="${spreadId}" style="display:none;background:#FAFDF8">${legCells}</tr>`);
+      });
+    }
+  });
+
+  tbody.innerHTML=rows.join('');
+}
+
+function toggleSpread(spreadId){
+  const legs=document.querySelectorAll(`.spread-leg[data-spread="${spreadId}"]`);
+  const parent=document.querySelector(`.spread-parent[data-spread="${spreadId}"]`);
+  const toggle=parent?.querySelector('.spread-toggle');
+  const expanded=legs[0]?.style.display!=='none';
+  legs.forEach(l=>l.style.display=expanded?'none':'');
+  if(toggle) toggle.textContent=expanded?'▶':'▼';
 }
 
 function resetColOrder(){colOrder=ALL_COLS.map(c=>c.key);colWidths={};colHidden={};closeColPanel();renderPositions();saveToGH();}
@@ -1171,6 +1308,235 @@ const COND_FIELDS=[
 ];
 
 
+
+// ═══════════════════════════════════════════════════════════
+// STRATEGY CLASSIFICATION & SPREAD GROUPING
+// ═══════════════════════════════════════════════════════════
+const STRATEGY_STYLES = {
+  'Naked Put':           {color:'#185FA5', bg:'#EAF1FB'},
+  'Naked Call':          {color:'#534AB7', bg:'#EEEDFE'},
+  'Covered Call':        {color:'#0F9B8E', bg:'#E0F5F3'},
+  'Strangle':            {color:'#7B3FA0', bg:'#F3E8FF'},
+  'Jade Lizard':         {color:'#C26D1A', bg:'#FEF0DC'},
+  'Vertical Put Spread': {color:'#1A6B8A', bg:'#E0F2F9'},
+  'Vertical Call Spread':{color:'#2D6B3F', bg:'#E4F5EB'},
+  'Put Calendar':        {color:'#8A5A1A', bg:'#FDF2E0'},
+  'Call Calendar':       {color:'#1A4D8A', bg:'#E0EAF9'},
+  'PMCC':                {color:'#6B1A6B', bg:'#F9E8F9'},
+  'Long Put':            {color:'#888780', bg:'#F0EFE9'},
+  'Long Call':           {color:'#888780', bg:'#F0EFE9'},
+  'Complex':             {color:'#888780', bg:'#F0EFE9'},
+  'Unknown':             {color:'#888780', bg:'#F0EFE9'},
+};
+
+function getUnderlying(sym) {
+  if(!sym) return '';
+  if(sym.startsWith('./')) return sym.split(' ')[0]; // futures: ./ESH6
+  const m = sym.match(/^([A-Z]+)\s/);
+  return m ? m[1] : sym.trim();
+}
+
+function classifyLegs(legs) {
+  if(!legs || !legs.length) return 'Unknown';
+  if(legs.length === 1) {
+    const l = legs[0];
+    const qty = parseInt(l['Quantity'] || '0');
+    const cp = l['Call/Put'] || '';
+    if(qty < 0 && cp === 'Put')  return 'Naked Put';
+    if(qty < 0 && cp === 'Call') return 'Naked Call';
+    if(qty > 0 && cp === 'Call') return 'Long Call';
+    if(qty > 0 && cp === 'Put')  return 'Long Put';
+    return 'Unknown';
+  }
+  const shortPuts  = legs.filter(l => parseInt(l['Quantity']) < 0 && l['Call/Put'] === 'Put');
+  const longPuts   = legs.filter(l => parseInt(l['Quantity']) > 0 && l['Call/Put'] === 'Put');
+  const shortCalls = legs.filter(l => parseInt(l['Quantity']) < 0 && l['Call/Put'] === 'Call');
+  const longCalls  = legs.filter(l => parseInt(l['Quantity']) > 0 && l['Call/Put'] === 'Call');
+  const exps = [...new Set(legs.map(l => l['Exp Date']))];
+  const sameExp = exps.length === 1;
+
+  // Vertical Put Spread: 1 short put + 1 long put, same exp, long < short strike
+  if(shortPuts.length===1 && longPuts.length===1 && shortCalls.length===0 && longCalls.length===0 && sameExp) {
+    const sp = parseFloat(shortPuts[0]['Strike Price']);
+    const lp = parseFloat(longPuts[0]['Strike Price']);
+    if(lp < sp) return 'Vertical Put Spread';
+  }
+  // Vertical Call Spread: 1 short call + 1 long call, same exp, short < long strike
+  if(shortCalls.length===1 && longCalls.length===1 && shortPuts.length===0 && longPuts.length===0 && sameExp) {
+    const sc = parseFloat(shortCalls[0]['Strike Price']);
+    const lc = parseFloat(longCalls[0]['Strike Price']);
+    if(sc < lc) return 'Vertical Call Spread';
+  }
+  // Strangle: 1 short put + 1 short call, same exp, no longs
+  if(shortPuts.length===1 && shortCalls.length===1 && longPuts.length===0 && longCalls.length===0 && sameExp)
+    return 'Strangle';
+  // Jade Lizard: 1 short put + 1 short call + 1 long call, same exp
+  if(shortPuts.length===1 && shortCalls.length===1 && longCalls.length===1 && longPuts.length===0 && sameExp) {
+    const sc = parseFloat(shortCalls[0]['Strike Price']);
+    const lc = parseFloat(longCalls[0]['Strike Price']);
+    if(sc < lc) return 'Jade Lizard';
+  }
+  // Calendars and PMCC (different expirations)
+  if(!sameExp) {
+    const allPuts  = shortPuts.concat(longPuts);
+    const allCalls = shortCalls.concat(longCalls);
+    if(allPuts.length === 2 && allCalls.length === 0) return 'Put Calendar';
+    // PMCC: 1 long call (DTE > 180) + 1 short call
+    if(longCalls.length === 1 && shortCalls.length === 1 && shortPuts.length === 0 && longPuts.length === 0) {
+      const longDTE = parseDays(longCalls[0]['DTE']) || 0;
+      return longDTE > 180 ? 'PMCC' : 'Call Calendar';
+    }
+    if(allCalls.length === 2 && allPuts.length === 0) return 'Call Calendar';
+  }
+  return 'Complex';
+}
+
+// Build spread groups: group positions by underlying, then find multi-leg strategies
+// Returns array of "display items" — each is either a single position or a spread group
+function buildDisplayItems(positionList) {
+  // Group by underlying
+  const byUnderlying = {};
+  positionList.forEach(p => {
+    const und = getUnderlying(p['Symbol']);
+    if(!byUnderlying[und]) byUnderlying[und] = [];
+    byUnderlying[und].push(p);
+  });
+
+  const used = new Set();
+  const items = [];
+
+  // For each underlying, try to form multi-leg groups by same expiration first
+  Object.entries(byUnderlying).forEach(([und, legs]) => {
+    if(legs.length === 1) return; // handled below
+
+    // Group by expiration
+    const byExp = {};
+    legs.forEach(l => {
+      const exp = l['Exp Date'] || 'none';
+      if(!byExp[exp]) byExp[exp] = [];
+      byExp[exp].push(l);
+    });
+
+    // Check same-exp groups
+    Object.values(byExp).forEach(expLegs => {
+      if(expLegs.length > 1) {
+        const type = classifyLegs(expLegs);
+        if(type !== 'Unknown' && type !== 'Naked Put' && type !== 'Naked Call' && type !== 'Long Put' && type !== 'Long Call') {
+          items.push({ isSpread: true, legs: expLegs, type, underlying: und });
+          expLegs.forEach(l => used.add(l));
+        }
+      }
+    });
+
+    // Check cross-exp (PMCC/Calendar) for unused legs
+    const unusedLegs = legs.filter(l => !used.has(l));
+    if(unusedLegs.length > 1) {
+      const type = classifyLegs(unusedLegs);
+      if(type === 'PMCC' || type === 'Put Calendar' || type === 'Call Calendar') {
+        items.push({ isSpread: true, legs: unusedLegs, type, underlying: und });
+        unusedLegs.forEach(l => used.add(l));
+      }
+    }
+  });
+
+  // All remaining single positions
+  positionList.forEach(p => {
+    if(!used.has(p)) {
+      const type = classifyLegs([p]);
+      items.push({ isSpread: false, legs: [p], type, underlying: getUnderlying(p['Symbol']), position: p });
+    }
+  });
+
+  return items;
+}
+
+// Aggregate spread financials for display
+function spreadAggregate(legs) {
+  const totalCost = legs.reduce((s, l) => s + (cleanNum(l['Cost']) || 0), 0);
+  const totalPLOpen = legs.reduce((s, l) => s + (cleanNum(l['P/L Open']) || 0), 0);
+  const plPct = totalCost !== 0 ? Math.round((totalPLOpen / Math.abs(totalCost)) * 1000) / 10 : null;
+  const minDTE = Math.min(...legs.map(l => parseDays(l['DTE']) || 999).filter(n => n < 999));
+  const avgPoP = (() => { const ps = legs.filter(l => cleanNum(l['PoP']) != null); return ps.length ? Math.round(ps.reduce((s,l) => s+(cleanNum(l['PoP'])||0),0)/ps.length) : null; })();
+  const totalMark = legs.reduce((s, l) => s + (cleanNum(l['Mark'])||0)*(Math.abs(cleanNum(l['Quantity'])||0))*100, 0);
+
+  // PAE for spread: sum of individual PAEs
+  let pae = null;
+  legs.forEach(l => {
+    const d = deriveFields(l);
+    if(d.pae !== null) {
+      pae = (pae || 0) + d.pae;
+    }
+  });
+  const paePct = (pae !== null && totalCost !== 0) ? Math.round((pae / Math.abs(totalCost)) * 1000) / 10 : null;
+
+  return { totalCost, totalPLOpen, plPct, minDTE, avgPoP, pae, paePct, totalMark };
+}
+
+// For bucket matching on a spread: evaluate bucket against spread aggregate
+function spreadMatchesBucket(legs, bucket) {
+  if(!bucket.conditions || !bucket.conditions.length) return false;
+  const agg = spreadAggregate(legs);
+  return bucket.conditions.every(cond => {
+    const {field, op, value} = cond;
+    let actual = null;
+    switch(field) {
+      case 'pl_pct':    actual = agg.plPct; break;
+      case 'pl_dollar': actual = agg.totalPLOpen; break;
+      case 'dte':       actual = agg.minDTE < 999 ? agg.minDTE : null; break;
+      case 'pop':       actual = agg.avgPoP; break;
+      case 'pae':       actual = agg.pae; break;
+      case 'pae_pct':   actual = agg.paePct; break;
+      // For per-leg fields, use first short leg
+      default: {
+        const shortLeg = legs.find(l => parseInt(l['Quantity']) < 0) || legs[0];
+        return shortLeg ? evalCondition(shortLeg, cond) : false;
+      }
+    }
+    if(actual === null) return false;
+    const numVal = parseFloat(value);
+    const isNum = !isNaN(numVal);
+    switch(op) {
+      case '>=': return isNum ? actual >= numVal : actual >= value;
+      case '<=': return isNum ? actual <= numVal : actual <= value;
+      case '>':  return isNum ? actual > numVal  : actual > value;
+      case '<':  return isNum ? actual < numVal  : actual < value;
+      case '=':  return String(actual) === String(value);
+      case '!=': return String(actual) !== String(value);
+      default:   return false;
+    }
+  });
+}
+
+function getBucketForItem(item) {
+  if(!item.isSpread) return getBucketForPosition(item.position);
+  for(const b of buckets) {
+    if(spreadMatchesBucket(item.legs, b)) return b;
+  }
+  return null;
+}
+
+function strategyTag(type) {
+  const s = STRATEGY_STYLES[type] || STRATEGY_STYLES['Unknown'];
+  return `<span style="font-size:9.5px;padding:2px 6px;border-radius:6px;font-weight:500;white-space:nowrap;background:${s.bg};color:${s.color};border:1px solid ${s.color}22">${type}</span>`;
+}
+
+function bucketTag(bucket) {
+  if(!bucket) return '<span style="color:var(--tx3)">—</span>';
+  return `<span style="font-size:10px;padding:2px 7px;border-radius:8px;font-weight:500;white-space:nowrap;background:${hexToRgba(bucket.color,0.13)};color:${bucket.color};border:1px solid ${hexToRgba(bucket.color,0.28)}">${bucket.name}</span>`;
+}
+
+function fmtSymbol(sym) {
+  if(!sym) return '';
+  // Equity: "AAPL  260417P00245000" → "AAPL"
+  // Futures: "./ESH6 E3CH6 260318C6770" → "ES" (strip ./ and contract suffix)
+  if(sym.startsWith('./')) {
+    const root = sym.split(' ')[0].replace('./',''); // e.g. ESH6
+    return root.replace(/[A-Z]\d$/, ''); // strip month+year suffix: ESH6 → ES
+  }
+  const m = sym.match(/^([A-Z/]+)\s/);
+  return m ? m[1] : sym.trim();
+}
+
 // Returns the first bucket that matches a position (respects order)
 
 function hexToRgba(hex, alpha){
@@ -1258,18 +1624,23 @@ function renderWorkflow(){
   }
   wfEmpty.style.display='none';
 
-  const matched=new Set();
-  const bucketPositions={};
+  const allItems=buildDisplayItems(positions);
+  const matchedItems=new Set();
+  const bucketItems={};
   buckets.forEach(b=>{
-    bucketPositions[b.id]=[];
-    positions.forEach(p=>{
-      if(!matched.has(p)&&matchesBucket(p,b)){
-        bucketPositions[b.id].push(p);
-        matched.add(p);
+    bucketItems[b.id]=[];
+    allItems.forEach(item=>{
+      if(!matchedItems.has(item)){
+        const matches=item.isSpread?spreadMatchesBucket(item.legs,b):matchesBucket(item.position,b);
+        if(matches){ bucketItems[b.id].push(item); matchedItems.add(item); }
       }
     });
   });
-  const uncategorized=positions.filter(p=>!matched.has(p));
+  const uncatItems=allItems.filter(item=>!matchedItems.has(item));
+  // For backwards compat with renderWFStats: also build flat position lists
+  const bucketPositions={};
+  buckets.forEach(b=>{ bucketPositions[b.id]=(bucketItems[b.id]||[]).flatMap(item=>item.legs); });
+  const uncategorized=uncatItems.flatMap(item=>item.legs);
 
   renderWFStats(positions);
   // Ensure all WF_COLS keys are in wfColOrder (adds newly introduced columns)
@@ -1278,9 +1649,10 @@ function renderWorkflow(){
 
   wfList.innerHTML=buckets.map(b=>{
     const list=bucketPositions[b.id]||[];
-    const totalPL=list.reduce((s,p)=>s+(cleanNum(p['P/L Open'])||0),0);
-    const avgDTE=list.length?Math.round(list.reduce((s,p)=>s+(parseDays(p['DTE'])||0),0)/list.length):0;
-    const popsArr=list.filter(p=>cleanNum(p['PoP'])!=null);
+    const bktLegs=(bucketItems[b.id]||[]).flatMap(i=>i.legs);
+    const totalPL=bktLegs.reduce((s,p)=>s+(cleanNum(p['P/L Open'])||0),0);
+    const avgDTE=bktLegs.length?Math.round(bktLegs.reduce((s,p)=>s+(parseDays(p['DTE'])||0),0)/bktLegs.length):0;
+    const popsArr=bktLegs.filter(p=>cleanNum(p['PoP'])!=null);
     const pop=popsArr.length?Math.round(popsArr.reduce((s,p)=>s+(cleanNum(p['PoP'])||0),0)/popsArr.length):null;
     const condSummary=b.conditions.map(c=>{const f=COND_FIELDS.find(x=>x.value===c.field);return `${f?f.label:c.field} ${c.op} ${c.value}`;}).join(' AND ');
     const bIdx=buckets.findIndex(x=>x.id===b.id);
@@ -1293,29 +1665,29 @@ function renderWorkflow(){
         <div class="wf-bdot" style="background:${b.color}"></div>
         <div class="wf-bname">${b.name}</div>
         <div style="font-size:10px;color:var(--tx3);flex:1;margin-left:6px;font-style:italic;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${condSummary}</div>
-        <div class="wf-bcnt">${list.length}</div>
+        <div class="wf-bcnt">${(bucketItems[b.id]||[]).length}</div>
         <div class="wf-bbtns" onclick="event.stopPropagation()">
           <button class="btn btn-sm" style="padding:2px 7px;font-size:10px" onclick="openBucketBuilder('${b.id}')">Edit</button>
         </div>
       </div>
       ${list.length?`<div class="wf-bmeta">
-        <div class="wf-bmi"><div class="wf-bml">Positions</div><div class="wf-bmv">${list.length}</div></div>
+        <div class="wf-bmi"><div class="wf-bml">Positions</div><div class="wf-bmv">${(bucketItems[b.id]||[]).length}</div></div>
         <div class="wf-bmi"><div class="wf-bml">P/L Open</div><div class="wf-bmv ${totalPL>=0?'cg':'cr'}">${totalPL>=0?'+$':'-$'}${Math.abs(totalPL).toFixed(0)}</div></div>
         <div class="wf-bmi"><div class="wf-bml">Avg DTE</div><div class="wf-bmv">${avgDTE}d</div></div>
         ${pop!==null?`<div class="wf-bmi"><div class="wf-bml">Avg PoP</div><div class="wf-bmv ${pop>=65?'cg':pop>=50?'ca':'cr'}">${pop}%</div></div>`:''}
       </div>`:''}
       <div class="wf-bbody ${list.length?'open':''}">
-        ${list.length?renderWFTable(list,b.id):'<div style="padding:10px 13px;font-size:12px;color:var(--tx3)">No positions match.</div>'}
+        ${(bucketItems[b.id]||[]).length?renderWFTable(bktLegs,b.id):'<div style="padding:10px 13px;font-size:12px;color:var(--tx3)">No positions match.</div>'}
       </div>
     </div>`;
   }).join('');
 
-  if(uncategorized.length){
+  if(uncatItems.length){
     wfUncat.innerHTML=`<div class="wf-bucket">
       <div class="wf-bhdr" onclick="toggleWFBucket(this)">
         <div class="wf-bdot" style="background:#888780"></div>
         <div class="wf-bname">Uncategorized</div>
-        <div class="wf-bcnt">${uncategorized.length}</div>
+        <div class="wf-bcnt">${uncatItems.length}</div>
       </div>
       <div class="wf-bbody open">${renderWFTable(uncategorized,'uncat')}</div>
     </div>`;
@@ -1329,11 +1701,34 @@ function renderWFStats(list){
   const itm=open.filter(p=>deriveFields(p).itmOtm==='ITM').length;
   const avgPop=open.filter(p=>cleanNum(p['PoP'])!=null).length
     ?Math.round(open.filter(p=>cleanNum(p['PoP'])!=null).reduce((s,p)=>s+(cleanNum(p['PoP'])||0),0)/open.filter(p=>cleanNum(p['PoP'])!=null).length):null;
+
+  // Per-bucket counts using same matching logic as renderWorkflow
+  const matched=new Set();
+  const bucketCounts={};
+  buckets.forEach(b=>{
+    bucketCounts[b.id]=0;
+    list.forEach(p=>{
+      if(!matched.has(p)&&matchesBucket(p,b)){ bucketCounts[b.id]++; matched.add(p); }
+    });
+  });
+  const uncatCount=list.filter(p=>!matched.has(p)).length;
+
+  const bucketWidgets=buckets.map(b=>`
+    <div class="stat" style="cursor:pointer" onclick="document.querySelector('[data-bucket-id=\'${b.id}\']')?.scrollIntoView({behavior:'smooth',block:'nearest'})">
+      <div class="sl" style="display:flex;align-items:center;gap:4px">
+        <span style="width:7px;height:7px;border-radius:50%;background:${b.color};display:inline-block"></span>
+        ${b.name}
+      </div>
+      <div class="sv" style="font-size:18px">${bucketCounts[b.id]}</div>
+    </div>`).join('');
+
   document.getElementById('wf-stats').innerHTML=`
-    <div class="stat"><div class="sl">Positions</div><div class="sv">${open.length}</div></div>
+    <div class="stat"><div class="sl">Total</div><div class="sv">${list.length}</div><div class="ss">${open.length} short</div></div>
     <div class="stat"><div class="sl">P/L Open</div><div class="sv ${totalPL>=0?'cg':'cr'}" style="font-size:16px">${fmt$(totalPL,true)}</div></div>
     <div class="stat"><div class="sl">Avg PoP</div><div class="sv ${avgPop>=65?'cg':avgPop>=50?'ca':'cr'}">${avgPop!==null?avgPop+'%':'—'}</div></div>
-    <div class="stat"><div class="sl">ITM count</div><div class="sv ${itm>0?'cr':'cg'}">${itm}</div></div>
+    <div class="stat"><div class="sl">ITM</div><div class="sv ${itm>0?'cr':'cg'}">${itm}</div></div>
+    ${bucketWidgets}
+    ${uncatCount>0?`<div class="stat"><div class="sl" style="display:flex;align-items:center;gap:4px"><span style="width:7px;height:7px;border-radius:50%;background:#888780;display:inline-block"></span>Uncategorized</div><div class="sv" style="font-size:18px">${uncatCount}</div></div>`:''}
   `;
 }
 
@@ -1343,6 +1738,7 @@ function renderWFStats(list){
 const WF_COLS = [
   {key:'Symbol',            label:'Symbol',     width:130, sortable:true,  fmt:'wf-symbol'},
   {key:'_bucket',           label:'Bucket',     width:110, sortable:true,  fmt:'wf-bucket'},
+  {key:'_type',             label:'Type',       width:145, sortable:true,  fmt:'strategy-tag'},
   {key:'Call/Put',          label:'C/P',        width:40,  sortable:true,  fmt:'wf-cp'},
   {key:'Strike Price',      label:'Strike',     width:72,  sortable:true,  fmt:'price4'},
   {key:'Quantity',          label:'Qty',        width:40,  sortable:true,  fmt:'qty'},
@@ -1367,9 +1763,13 @@ const WF_COLS = [
 ];
 
 function wfSortVal(p, colKey){
-  if(colKey==='_pae'||colKey==='_pae_pct'){
+  if(colKey==='_pae'||colKey==='_pae_pct'||colKey==='_ann_yield'||colKey==='_capital'||colKey==='_type'){
     const d=deriveFields(p);
-    return colKey==='_pae'?d.pae:d.paePct;
+    if(colKey==='_pae') return d.pae;
+    if(colKey==='_pae_pct') return d.paePct;
+    if(colKey==='_ann_yield') return d._annYield;
+    if(colKey==='_capital') return d._capital;
+    if(colKey==='_type') return d._stratType||'';
   }
   if(colKey==='_bucket'){
     const b=getBucketForPosition(p);
@@ -1421,8 +1821,11 @@ function renderWFTable(list, bucketId){
       const w=wfColWidths[col.key]||col.width;
       const style=`width:${w}px;min-width:${w}px;max-width:${w}px`;
       const val=col.key==='_bucket'?'__wfbucket__':
+                col.key==='_type'?'__type__':
                 col.key==='_pae'?'__pae__':
                 col.key==='_pae_pct'?'__pae_pct__':
+                col.key==='_ann_yield'?'__ann_yield__':
+                col.key==='_capital'?'__capital__':
                 p[col.key];
       const html=fmtWFCell(col,val,derived,p);
       const align=['money','pl-money','pl-pct','pop','num1','num2','price2','price4','qty','dte','days'].includes(col.fmt)?'text-align:right':'';
@@ -1456,6 +1859,11 @@ function fmtWFCell(col, val, derived, pos){
   }
   if(col.fmt==='wf-cp'){
     return val==='Put'?'<span class="badge br">P</span>':'<span class="badge bg">C</span>';
+  }
+  // Handle _type sentinel  
+  if(val==='__type__'){
+    const t = derived?._stratType || 'Unknown';
+    return strategyTag(t);
   }
   // Reuse main fmtCell for all other formats
   return fmtCell(col,val,derived,pos);
@@ -1715,7 +2123,7 @@ function clearAll(){
 // ═══════════════════════════════════════════════════════════
 // COLUMN PANEL
 // ═══════════════════════════════════════════════════════════
-const ESSENTIAL_COLS = ['_cb','Symbol','_bucket','Call/Put','Quantity','Strike Price','Exp Date','DTE',"D's Opn",'Trade Price','Mark','P/L Open','P/L Opn%','_pae','_pae_pct','PoP','β Delta','/ Delta','Underlying Last Price','_actions'];
+const ESSENTIAL_COLS = ['_cb','Symbol','_bucket','_type','Call/Put','Quantity','Strike Price','Exp Date','DTE',"D's Opn",'Trade Price','Mark','P/L Open','P/L Opn%','_pae','_pae_pct','PoP','β Delta','/ Delta','Underlying Last Price','_actions'];
 
 function toggleColPanel(){
   const panel = document.getElementById('col-panel');
