@@ -2051,7 +2051,7 @@
     "Ext RoR %": true,
     "P/L YTD": true
   },
-  "posImportDate": "3/19/2026, 1:20:40 PM",
+  "posImportDate": "3/19/2026, 2:24:30 PM",
   "wfColOrder": [
     "Symbol",
     "_bucket",
@@ -2081,5 +2081,5 @@
   ],
   "wfColWidths": {},
   "wfColHidden": {},
-  "updated": "2026-03-19T20:28:47.541Z"
+  "updated": "2026-03-19T21:24:30.366Z"
 }
