@@ -1845,8 +1845,8 @@
       "conditions": [
         {
           "field": "pl_pct",
-          "op": ">",
-          "value": "200"
+          "op": "<",
+          "value": "-200"
         }
       ]
     },
@@ -1950,5 +1950,5 @@
   ],
   "wfColWidths": {},
   "wfColHidden": {},
-  "updated": "2026-03-19T15:14:36.478Z"
+  "updated": "2026-03-19T15:15:55.755Z"
 }
