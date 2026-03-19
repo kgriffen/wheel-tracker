@@ -1851,18 +1851,6 @@
       ]
     },
     {
-      "id": "b-urgent",
-      "name": "Urgent",
-      "color": "#D85A30",
-      "conditions": [
-        {
-          "field": "pae_pct",
-          "op": "<",
-          "value": "0"
-        }
-      ]
-    },
-    {
       "id": "b-early-close",
       "name": "Early Close Rule",
       "color": "#1D9E75",
@@ -1871,6 +1859,18 @@
           "field": "early_profit",
           "op": "=",
           "value": "true"
+        }
+      ]
+    },
+    {
+      "id": "b-urgent",
+      "name": "Urgent",
+      "color": "#D85A30",
+      "conditions": [
+        {
+          "field": "pae_pct",
+          "op": "<",
+          "value": "0"
         }
       ]
     },
@@ -1950,5 +1950,5 @@
   ],
   "wfColWidths": {},
   "wfColHidden": {},
-  "updated": "2026-03-19T15:17:08.732Z"
+  "updated": "2026-03-19T15:17:19.061Z"
 }
