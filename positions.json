@@ -2076,7 +2076,9 @@
     "Î² Delta",
     "Sector"
   ],
-  "wfColWidths": {},
+  "wfColWidths": {
+    "Strike Price": 49
+  },
   "wfColHidden": {},
-  "updated": "2026-03-20T14:13:31.844Z"
+  "updated": "2026-03-20T14:13:35.865Z"
 }
