@@ -730,7 +730,10 @@ function handleImport(e){
       if(!row['Symbol']) continue;
       rows.push(row);
     }
-    positions=rows;
+    // Deduplicate by Symbol — prevents accumulation across imports
+    const symMap=new Map();
+    rows.forEach(r=>symMap.set(r['Symbol'],r));
+    positions=[...symMap.values()];
     posImportDate=new Date().toLocaleString();
     document.getElementById('pos-date-lbl').textContent='Imported: '+today();
     showImportResult('ok',`✓ Loaded ${rows.length} positions. Previous data replaced.`);
