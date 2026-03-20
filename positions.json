@@ -2042,7 +2042,7 @@
   ],
   "colWidths": {},
   "colHidden": {},
-  "posImportDate": "3/19/2026, 7:57:38 PM",
+  "posImportDate": "3/19/2026, 7:58:59 PM",
   "wfColOrder": [
     "Symbol",
     "_bucket",
@@ -2063,15 +2063,16 @@
     "PoP",
     "IV Rank",
     "Underlying Last Price",
-    "ÃÂ² Delta",
+    "ÃÂÃÂ² Delta",
     "/ Delta",
     "Theta",
     "Cost",
     "Sector",
+    "ÃÂ² Delta",
     "Î² Delta",
     "β Delta"
   ],
   "wfColWidths": {},
   "wfColHidden": {},
-  "updated": "2026-03-20T02:57:38.259Z"
+  "updated": "2026-03-20T02:58:59.085Z"
 }
