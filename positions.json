@@ -2048,12 +2048,12 @@
   "posImportDate": "3/20/2026, 7:09:27 AM",
   "wfColOrder": [
     "Symbol",
+    "Call/Put",
     "_bucket",
     "DTE",
     "P/L Opn%",
     "P/L Open",
     "P/L Day",
-    "Call/Put",
     "Strike Price",
     "Quantity",
     "Exp Date",
@@ -2078,5 +2078,5 @@
   ],
   "wfColWidths": {},
   "wfColHidden": {},
-  "updated": "2026-03-20T14:12:24.521Z"
+  "updated": "2026-03-20T14:12:49.599Z"
 }
