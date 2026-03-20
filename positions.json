@@ -2052,6 +2052,7 @@
     "DTE",
     "P/L Opn%",
     "P/L Open",
+    "P/L Day",
     "Call/Put",
     "Strike Price",
     "Quantity",
@@ -2061,7 +2062,6 @@
     "Mark",
     "_pae",
     "_pae_pct",
-    "P/L Day",
     "PoP",
     "IV Rank",
     "Underlying Last Price",
@@ -2078,5 +2078,5 @@
   ],
   "wfColWidths": {},
   "wfColHidden": {},
-  "updated": "2026-03-20T14:12:14.657Z"
+  "updated": "2026-03-20T14:12:24.521Z"
 }
