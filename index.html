@@ -575,22 +575,27 @@ async function saveToGH(){
   if(!ghCfg.token)return;
   showSync('syncing','Saving…');
   try{
-    // If we don't have the SHA, fetch it first (needed for updating existing file)
-    if(!ghSha){
-      try{
-        const check=await fetch(ghUrl(),{headers:ghH()});
-        if(check.ok){ const cd=await check.json(); ghSha=cd.sha; }
-      }catch(e){}
-    }
+    // Always fetch current SHA before saving to avoid 409 conflicts
+    const check=await fetch(ghUrl(),{headers:ghH()});
+    if(check.ok){ const cd=await check.json(); ghSha=cd.sha; }
+    else if(check.status===404){ ghSha=null; } // file doesn't exist yet
+    else throw new Error('SHA fetch failed: '+check.status);
+
     const encoded=btoa(unescape(encodeURIComponent(JSON.stringify(data,null,2))));
     const body={message:'Update positions '+today(),content:encoded};
     if(ghSha)body.sha=ghSha;
     const r=await fetch(ghUrl(),{method:'PUT',headers:ghH(),body:JSON.stringify(body)});
-    if(!r.ok)throw new Error('HTTP '+r.status);
+    if(!r.ok){
+      const errText=await r.text().catch(()=>'');
+      throw new Error('HTTP '+r.status+' '+errText.slice(0,100));
+    }
     const d=await r.json();
     ghSha=d.content?.sha;
-    showSync('ok','Saved ✓');
-  }catch(e){showSync('err','Save failed — stored locally');}
+    showSync('ok','Saved to GitHub ✓');
+  }catch(e){
+    showSync('err','GitHub save failed: '+e.message);
+    console.error('saveToGH error:',e);
+  }
 }
 
 async function testGH(){
@@ -724,7 +729,7 @@ function deriveFields(p){
 function handleImport(e){
   const file=e.target.files[0]; if(!file) return;
   const reader=new FileReader();
-  reader.onload=ev=>{
+  reader.onload=async ev=>{
     const lines=ev.target.result.split('\n').map(l=>l.trim()).filter(Boolean);
     if(lines.length<2){showImportResult('error','File appears empty.');return;}
     const headers=parseCsvLine(lines[0]);
@@ -740,9 +745,15 @@ function handleImport(e){
     positions=rows;
     posImportDate=new Date().toLocaleString();
     document.getElementById('pos-date-lbl').textContent='Imported: '+today();
-    showImportResult('ok',`✓ Loaded ${positions.length} positions. Previous data replaced.`);
-    ghSha=null; // force fresh SHA fetch — overwrites any stale GitHub data
-    saveToGH();
+    showImportResult('ok',`✓ Loaded ${positions.length} positions. Saving to GitHub…`);
+    ghSha=null;
+    await saveToGH();
+    const syncLbl=document.getElementById('sync-lbl').textContent;
+    if(syncLbl.includes('✓')){
+      showImportResult('ok',`✓ Loaded ${positions.length} positions. Saved to GitHub.`);
+    } else {
+      showImportResult('warn',`✓ Loaded ${positions.length} positions. GitHub save failed — check Settings.`);
+    }
     renderAll();
     e.target.value='';
   };
@@ -752,7 +763,7 @@ function handleImport(e){
 function showImportResult(type,msg){
   const el=document.getElementById('import-result');
   el.style.display='block';
-  el.style.color=type==='ok'?'var(--green)':'var(--red)';
+  el.style.color=type==='ok'?'var(--green)':type==='warn'?'var(--amber)':'var(--red)';
   el.textContent=msg;
 }
 
