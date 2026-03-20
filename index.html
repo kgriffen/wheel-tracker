@@ -988,16 +988,11 @@ function renderPosStats(list){
   const shorts=all.filter(p=>cleanNum(p['Quantity'])<0);
   const totalCost=shorts.reduce((s,p)=>s+(cleanNum(p['Cost'])||0),0);
   const totalPL=all.reduce((s,p)=>s+(cleanNum(p['P/L Open'])||0),0);
-  // Notional exposure: use unique short legs only (avoid double-counting spread legs)
-  // buildDisplayItems groups spreads, so we sum from the flat unique positions set
-  const uniqueShorts=new Set();
-  buildDisplayItems(all).forEach(item=>item.legs.forEach(l=>{
-    if(cleanNum(l['Quantity'])<0) uniqueShorts.add(l);
-  }));
-  const totalCapital=[...uniqueShorts].reduce((s,p)=>{
-    const str=cleanNum(p['Strike Price']),qty=Math.abs(cleanNum(p['Quantity'])||0);
-    const isF=(p['Type']||'')==='FUTURES_OPTION';
-    return s+(!isF&&str?str*100*qty:0);
+  // Notional exposure: sum _capital from deriveFields for short positions only
+  // deriveFields already handles futures exclusion and per-position capital correctly
+  const totalCapital=shorts.reduce((s,p)=>{
+    const d=deriveFields(p);
+    return s+(d._capital||0);
   },0);
   const annYield=totalCapital>0?Math.round((totalCost/totalCapital)*365/45*100*10)/10:null; // ~45d avg assumption
   // Avg ann yield — equity only, exclude outliers > 500% (data anomalies)
