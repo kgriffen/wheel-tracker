@@ -1,0 +1,77 @@
+{
+  "positions": [],
+  "buckets": [
+    {
+      "id": "b-urgent",
+      "name": "Urgent",
+      "color": "#D85A30",
+      "conditions": [
+        {
+          "field": "pop",
+          "op": "<",
+          "value": "50"
+        }
+      ]
+    },
+    {
+      "id": "b-take-profits",
+      "name": "Take Profits",
+      "color": "#7F77DD",
+      "conditions": [
+        {
+          "field": "pl_pct",
+          "op": ">=",
+          "value": "50"
+        }
+      ]
+    },
+    {
+      "id": "b-early-close",
+      "name": "Early Close Rule",
+      "color": "#1D9E75",
+      "conditions": [
+        {
+          "field": "early_profit",
+          "op": "=",
+          "value": "true"
+        }
+      ]
+    },
+    {
+      "id": "b-warning",
+      "name": "Warning",
+      "color": "#EF9F27",
+      "conditions": [
+        {
+          "field": "pop",
+          "op": "<",
+          "value": "65"
+        }
+      ]
+    },
+    {
+      "id": "b-working",
+      "name": "Working",
+      "color": "#185FA5",
+      "conditions": [
+        {
+          "field": "itm_otm",
+          "op": "=",
+          "value": "OTM"
+        },
+        {
+          "field": "pop",
+          "op": ">=",
+          "value": "65"
+        }
+      ]
+    }
+  ],
+  "colWidths": {},
+  "colHidden": {},
+  "posImportDate": "",
+  "wfColOrder": [],
+  "wfColWidths": {},
+  "wfColHidden": {},
+  "updated": "2026-03-20T01:40:05.936Z"
+}
