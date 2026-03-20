@@ -2040,11 +2040,38 @@
       ]
     }
   ],
-  "colWidths": {},
+  "colWidths": {
+    "Cost": 173
+  },
   "colHidden": {},
   "posImportDate": "3/19/2026, 8:05:35 PM",
-  "wfColOrder": [],
+  "wfColOrder": [
+    "Symbol",
+    "_bucket",
+    "_type",
+    "Call/Put",
+    "Strike Price",
+    "Quantity",
+    "Exp Date",
+    "DTE",
+    "D's Opn",
+    "Trade Price",
+    "Mark",
+    "P/L Open",
+    "P/L Opn%",
+    "_pae",
+    "_pae_pct",
+    "P/L Day",
+    "PoP",
+    "IV Rank",
+    "Underlying Last Price",
+    "β Delta",
+    "/ Delta",
+    "Theta",
+    "Cost",
+    "Sector"
+  ],
   "wfColWidths": {},
   "wfColHidden": {},
-  "updated": "2026-03-20T03:05:35.168Z"
+  "updated": "2026-03-20T03:12:50.758Z"
 }
