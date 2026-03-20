@@ -1437,13 +1437,15 @@ function classifyLegs(legs) {
   if(!sameExp) {
     const allPuts  = shortPuts.concat(longPuts);
     const allCalls = shortCalls.concat(longCalls);
-    if(allPuts.length === 2 && allCalls.length === 0) return 'Put Calendar';
+    // Put Calendar: 1 short put + 1 long put, different expirations
+    if(shortPuts.length===1 && longPuts.length===1 && shortCalls.length===0 && longCalls.length===0) return 'Put Calendar';
     // PMCC: 1 long call (DTE > 180) + 1 short call
     if(longCalls.length === 1 && shortCalls.length === 1 && shortPuts.length === 0 && longPuts.length === 0) {
       const longDTE = parseDays(longCalls[0]['DTE']) || 0;
       return longDTE > 180 ? 'PMCC' : 'Call Calendar';
     }
-    if(allCalls.length === 2 && allPuts.length === 0) return 'Call Calendar';
+    // Call Calendar: 1 short call + 1 long call, different expirations
+    if(shortCalls.length===1 && longCalls.length===1 && shortPuts.length===0 && longPuts.length===0) return 'Call Calendar';
   }
   return 'Complex';
 }
@@ -1513,7 +1515,8 @@ function spreadAggregate(legs) {
   const totalPLOpen = legs.reduce((s, l) => s + (cleanNum(l['P/L Open']) || 0), 0);
   const plPct = totalCost !== 0 ? Math.round((totalPLOpen / Math.abs(totalCost)) * 1000) / 10 : null;
   const minDTE = Math.min(...legs.map(l => parseDays(l['DTE']) || 999).filter(n => n < 999));
-  const avgPoP = (() => { const ps = legs.filter(l => cleanNum(l['PoP']) != null); return ps.length ? Math.round(ps.reduce((s,l) => s+(cleanNum(l['PoP'])||0),0)/ps.length) : null; })();
+  // PoP uses short legs only — long legs have inverse PoP which would skew the avg
+  const avgPoP = (() => { const ps = legs.filter(l => cleanNum(l['Quantity'])<0 && cleanNum(l['PoP']) != null); return ps.length ? Math.round(ps.reduce((s,l) => s+(cleanNum(l['PoP'])||0),0)/ps.length) : null; })();
   const totalMark = legs.reduce((s, l) => s + (cleanNum(l['Mark'])||0)*(Math.abs(cleanNum(l['Quantity'])||0))*100, 0);
 
   // PAE for spread: sum of ALL leg PAEs (short AND long)
@@ -1791,7 +1794,7 @@ function renderWFStats(list){
     <div class="stat"><div class="sl">Total</div><div class="sv">${statsItems.length}</div><div class="ss">${open.length} short</div></div>
     <div class="stat"><div class="sl">P/L Open</div><div class="sv ${totalPL>=0?'cg':'cr'}" style="font-size:16px">${fmt$(totalPL,true)}</div></div>
     <div class="stat"><div class="sl">Avg PoP</div><div class="sv ${avgPop>=65?'cg':avgPop>=50?'ca':'cr'}">${avgPop!==null?avgPop+'%':'—'}</div></div>
-    <div class="stat"><div class="sl">ITM</div><div class="sv ${itm>0?'cr':'cg'}">${itm}</div></div>
+    <div class="stat"><div class="sl">ITM</div><div class="sv ${itm>0?'cr':'cg'}">${itm}</div><div class="ss">of ${list.length}</div></div>
     ${bucketWidgets}
     ${uncatCount>0?`<div class="stat"><div class="sl" style="display:flex;align-items:center;gap:4px"><span style="width:7px;height:7px;border-radius:50%;background:#888780;display:inline-block"></span>Uncategorized</div><div class="sv" style="font-size:18px">${uncatCount}</div></div>`:''}
   `;
