@@ -480,7 +480,7 @@ const ALL_COLS = [
   {key:'Cost',      label:'Cost',      width:75,  sortable:true,  fmt:'money'},
   {key:'Ext',       label:'Ext Val',   width:75,  sortable:true,  fmt:'money'},
   {key:'_ann_yield',label:'Ann Yield', width:70,  sortable:true,  fmt:'ann-yield'},
-  {key:'_capital',  label:'Capital',   width:80,  sortable:true,  fmt:'money'},
+  {key:'_capital',  label:'Capital',   width:80,  sortable:true,  fmt:'capital'},
   {key:'P/L Open',  label:'P/L $',     width:75,  sortable:true,  fmt:'pl-money'},
   {key:'P/L Opn%',  label:'P/L %',     width:60,  sortable:true,  fmt:'pl-pct'},
   {key:'_pae',      label:'PAE $',      width:75,  sortable:true,  fmt:'pae-money'},
@@ -690,16 +690,17 @@ function deriveFields(p){
     }
   }
 
-  // Ann Yield: (Cost / (DTE + DaysOpn)) * (365 / Cost) = 365 / (DTE + DaysOpn) — simplified
-  // More correct: (Cost / Strike*100*|qty|) * (365 / (DTE+DaysOpn)) * 100
+  // Ann Yield: (Cost / Capital) * (365 / (DTE + DaysOpn)) * 100
+  // Exclude futures — their strike values are FX rates/index points not dollar strikes
   let _annYield = null;
-  if(cost && cost > 0 && dte !== null && daysOpn !== null && (dte + daysOpn) > 0 && strike && qty) {
+  const _isFutures = (p['Type']||'') === 'FUTURES_OPTION';
+  if(!_isFutures && cost && cost > 0 && dte !== null && daysOpn !== null && (dte + daysOpn) > 0 && strike && qty) {
     const capital = Math.abs(strike) * 100 * Math.abs(qty);
     if(capital > 0) _annYield = Math.round((cost / capital) * (365 / (dte + daysOpn)) * 100 * 10) / 10;
   }
 
-  // Capital used: strike * 100 * |qty| for equity options
-  const _capital = (strike && qty && (p['Type']||'') !== 'FUTURES_OPTION')
+  // Capital used: strike * 100 * |qty| for equity options only
+  const _capital = (strike && qty && !_isFutures)
     ? Math.abs(strike) * 100 * Math.abs(qty)
     : null;
 
@@ -895,17 +896,11 @@ function fmtCell(col,val,derived,pos){
       return '<span style="color:var(--tx3)">—</span>';
     }
     case 'capital':{
-      const n=cleanNum(val);
-      if(n===null) return '<span style="color:var(--tx3)">—</span>';
+      const n = val==='__capital__' ? derived?._capital : cleanNum(val);
+      if(n===null||n===undefined) return '<span style="color:var(--tx3)">—</span>';
       return `<span class="mono">$${n.toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:0})}</span>`;
     }
     default:
-      // Handle __capital__ sentinel
-      if(val==='__capital__'){
-        const n=derived?._capital;
-        if(n===null||n===undefined) return '<span style="color:var(--tx3)">—</span>';
-        return `<span class="mono">$${n.toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:0})}</span>`;
-      }
       return `<span style="font-size:12px">${val}</span>`;
   }
 }
@@ -987,15 +982,16 @@ function renderPosStats(list){
   const totalPL=all.reduce((s,p)=>s+(cleanNum(p['P/L Open'])||0),0);
   const totalCapital=shorts.reduce((s,p)=>{
     const str=cleanNum(p['Strike Price']),qty=Math.abs(cleanNum(p['Quantity'])||0);
-    return s+(str&&p['Type']!=='FUTURES_OPTION'?str*100*qty:0);
+    const isF=(p['Type']||'')==='FUTURES_OPTION';
+    return s+(!isF&&str?str*100*qty:0);
   },0);
   const annYield=totalCapital>0?Math.round((totalCost/totalCapital)*365/45*100*10)/10:null; // ~45d avg assumption
-  // Weighted ann yield: sum of individual
+  // Avg ann yield — equity only, exclude outliers > 500% (data anomalies)
   let wAnnYield=null;
-  const yieldSamples=shorts.map(p=>{
-    const d=deriveFields(p);
-    return d._annYield;
-  }).filter(n=>n!==null);
+  const yieldSamples=shorts
+    .filter(p=>(p['Type']||'')!=='FUTURES_OPTION')
+    .map(p=>deriveFields(p)._annYield)
+    .filter(n=>n!==null && n<=500 && n>=0);
   if(yieldSamples.length) wAnnYield=Math.round(yieldSamples.reduce((s,n)=>s+n,0)/yieldSamples.length*10)/10;
 
   const avgPop=()=>{const ps=all.filter(p=>cleanNum(p['PoP'])!=null);return ps.length?Math.round(ps.reduce((s,p)=>s+(cleanNum(p['PoP'])||0),0)/ps.length):null;};
@@ -1005,7 +1001,7 @@ function renderPosStats(list){
   document.getElementById('pos-stats').innerHTML=`
     <div class="stat"><div class="sl">Positions</div><div class="sv">${shorts.length} <span style="font-size:13px;color:var(--tx3)">short</span></div><div class="ss">${all.length} total</div></div>
     <div class="stat"><div class="sl">Total premium</div><div class="sv cg" style="font-size:16px">${fmt$(totalCost)}</div></div>
-    <div class="stat"><div class="sl">Capital used</div><div class="sv" style="font-size:15px">$${totalCapital>0?Math.round(totalCapital/1000)+'k':'—'}</div></div>
+    <div class="stat"><div class="sl">Capital used</div><div class="sv cg" style="font-size:16px">${totalCapital>0?fmt$(totalCapital):'—'}</div></div>
     <div class="stat"><div class="sl">Avg ann yield</div><div class="sv ${wAnnYield>=20?'cg':wAnnYield>=10?'ca':''}">${wAnnYield!==null?wAnnYield+'%':'—'}</div></div>
     <div class="stat"><div class="sl">P/L Open</div><div class="sv ${totalPL>=0?'cg':'cr'}" style="font-size:16px">${fmt$(totalPL,true)}</div></div>
     <div class="stat"><div class="sl">Avg PoP</div><div class="sv ${pop>=65?'cg':pop>=50?'ca':'cr'}">${pop!==null?pop+'%':'—'}</div></div>
