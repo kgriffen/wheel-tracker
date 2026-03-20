@@ -744,6 +744,7 @@ function handleImport(e){
     }
     positions=rows;
     posImportDate=new Date().toLocaleString();
+    localStorage.removeItem('wt_data'); // clear stale cache before saving fresh import
     document.getElementById('pos-date-lbl').textContent='Imported: '+today();
     showImportResult('ok',`✓ Loaded ${positions.length} positions. Saving to GitHub…`);
     ghSha=null;
@@ -1000,7 +1001,6 @@ function renderPosStats(list){
   const totalCost=shorts.reduce((s,p)=>s+(cleanNum(p['Cost'])||0),0);
   const totalPL=all.reduce((s,p)=>s+(cleanNum(p['P/L Open'])||0),0);
   // Notional exposure: sum _capital from deriveFields for short positions only
-  // deriveFields already handles futures exclusion and per-position capital correctly
   const totalCapital=shorts.reduce((s,p)=>{
     const d=deriveFields(p);
     return s+(d._capital||0);
