@@ -1,0 +1,2357 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wheel Tracker</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#F7F6F2;--surf:#FFF;--surf2:#F0EFE9;--surf3:#E8E7E0;
+  --bdr:rgba(0,0,0,0.07);--bdr2:rgba(0,0,0,0.13);
+  --tx:#1A1917;--tx2:#6B6A65;--tx3:#9E9D98;
+  --green:#1D9E75;--gbg:#EAF5EF;--gt:#0F6E56;
+  --red:#D85A30;--rbg:#FDF0EB;--rt:#993C1D;
+  --amber:#BA7517;--abg:#FDF5E6;--at:#854F0B;
+  --blue:#185FA5;--bbg:#EAF1FB;--bt:#0C447C;
+  --purple:#534AB7;--pbg:#EEEDFE;--pt:#3C3489;
+  --r:8px;--rl:12px;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{font-size:14px}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--tx);min-height:100vh;-webkit-font-smoothing:antialiased}
+
+/* TOPBAR */
+.topbar{background:var(--surf);border-bottom:1px solid var(--bdr);height:50px;display:flex;align-items:center;padding:0 16px;position:sticky;top:0;z-index:50;gap:0}
+.logo{font-size:13px;font-weight:500;display:flex;align-items:center;gap:7px;margin-right:24px;white-space:nowrap}
+.logo-icon{width:22px;height:22px;background:var(--tx);border-radius:5px;display:flex;align-items:center;justify-content:center}
+.logo-icon svg{width:12px;height:12px;stroke:#fff;stroke-width:2;fill:none}
+nav{display:flex;gap:1px;flex:1}
+.nbtn{padding:5px 12px;font-size:13px;font-family:inherit;color:var(--tx2);background:none;border:none;border-radius:var(--r);cursor:pointer;transition:all .12s}
+.nbtn:hover{background:var(--surf2);color:var(--tx)}
+.nbtn.active{background:var(--surf2);color:var(--tx);font-weight:500}
+.tr{display:flex;align-items:center;gap:7px}
+.btn{padding:5px 12px;font-size:13px;font-family:inherit;border:1px solid var(--bdr2);border-radius:var(--r);cursor:pointer;background:var(--surf);color:var(--tx);transition:all .12s;white-space:nowrap}
+.btn:hover{background:var(--surf2)}
+.btn:active{transform:scale(.98)}
+.btn-p{background:var(--tx);color:#fff;border-color:var(--tx)}
+.btn-p:hover{opacity:.85;background:var(--tx)}
+.btn-sm{padding:3px 9px;font-size:12px}
+.btn-danger{color:var(--rt);border-color:var(--red)}
+.btn-danger:hover{background:var(--rbg)}
+
+/* PAGES */
+.page{display:none;padding:20px 16px;max-width:100%;margin:0 auto}
+.page.active{display:block}
+.ph{margin-bottom:14px;display:flex;align-items:baseline;gap:10px}
+.pt{font-size:18px;font-weight:500;letter-spacing:-.02em}
+.ps{font-size:12px;color:var(--tx3)}
+
+/* STAT GRID */
+.sg{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin-bottom:14px}
+.stat{background:var(--surf);border:1px solid var(--bdr);border-radius:var(--rl);padding:11px 13px}
+.sl{font-size:10px;color:var(--tx3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px}
+.sv{font-size:19px;font-weight:500;letter-spacing:-.03em;line-height:1}
+.ss{font-size:11px;color:var(--tx3);margin-top:2px}
+.cg{color:var(--green)}.cr{color:var(--red)}.ca{color:var(--amber)}.cb{color:var(--blue)}.cp{color:var(--purple)}
+
+/* TABLE CARD */
+.tcard{background:var(--surf);border:1px solid var(--bdr);border-radius:var(--rl);overflow:hidden;margin-bottom:12px}
+.toolbar{padding:9px 12px;display:flex;gap:7px;align-items:center;flex-wrap:wrap;border-bottom:1px solid var(--bdr);background:var(--surf)}
+.si{padding:5px 10px;font-size:13px;font-family:inherit;border:1px solid var(--bdr2);border-radius:var(--r);background:var(--surf2);color:var(--tx);outline:none;transition:border-color .12s}
+.si:focus{border-color:var(--tx);background:var(--surf)}
+.si-grow{flex:1;min-width:120px}
+
+/* BULK BAR */
+.bulk-bar{display:none;align-items:center;gap:9px;padding:7px 12px;background:var(--bbg);border-bottom:1px solid rgba(24,95,165,.15);font-size:12px}
+.bulk-bar.show{display:flex}
+.bulk-ct{font-weight:500;color:var(--bt)}
+
+/* TABLE */
+.tw{overflow-x:auto;overflow-y:auto;max-height:calc(100vh - 220px)}
+table{border-collapse:collapse;font-size:12px;table-layout:fixed;width:max-content;min-width:100%}
+thead{position:sticky;top:0;z-index:10;background:var(--surf)}
+th{
+  position:relative;
+  text-align:left;
+  font-size:10px;font-weight:500;color:var(--tx3);
+  padding:6px 8px;
+  border-bottom:1px solid var(--bdr);
+  border-right:1px solid var(--bdr);
+  white-space:nowrap;
+  user-select:none;
+  text-transform:uppercase;letter-spacing:.3px;
+  background:var(--surf);
+  cursor:pointer;
+  overflow:hidden;
+}
+th:last-child{border-right:none}
+th.sortable:hover{color:var(--tx2)}
+th .sort-arrow{font-size:8px;margin-left:2px;opacity:.4}
+th .sort-arrow.active{opacity:1;color:var(--blue)}
+/* resize handle */
+.resize-handle{
+  position:absolute;right:0;top:0;bottom:0;width:5px;
+  cursor:col-resize;background:transparent;z-index:2;
+}
+.resize-handle:hover,.resize-handle.dragging{background:var(--blue);opacity:.4}
+/* drag reorder */
+th.drag-over{background:var(--bbg)}
+th.dragging-col{opacity:.4}
+td{
+  padding:6px 8px;
+  border-bottom:1px solid var(--bdr);
+  border-right:1px solid var(--bdr);
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  vertical-align:middle;
+}
+td:last-child{border-right:none}
+tr:last-child td{border-bottom:none}
+tbody tr:hover td{background:#FAFAF7}
+tbody tr.selected td{background:#EEF5FC !important}
+.mono{font-family:'DM Mono',monospace;font-size:11px}
+.num-r{text-align:right}
+
+/* BADGES */
+.badge{display:inline-flex;align-items:center;padding:1px 6px;border-radius:20px;font-size:10.5px;font-weight:500;white-space:nowrap}
+.bg{background:var(--gbg);color:var(--gt)}
+.br{background:var(--rbg);color:var(--rt)}
+.ba{background:var(--abg);color:var(--at)}
+.bb{background:var(--bbg);color:var(--bt)}
+.bgy{background:var(--surf2);color:var(--tx2);border:1px solid var(--bdr)}
+.bp{background:var(--pbg);color:var(--pt)}
+input[type=checkbox]{width:13px;height:13px;cursor:pointer;accent-color:var(--tx)}
+.cb-col{width:28px !important;padding:6px 6px 6px 10px !important}
+
+/* EMPTY */
+.empty{text-align:center;padding:48px 20px;color:var(--tx3)}
+.et{font-size:13px;font-weight:500;color:var(--tx2);margin-bottom:5px;margin-top:10px}
+
+/* MODAL */
+.mo{display:none;position:fixed;inset:0;background:rgba(0,0,0,.3);z-index:200;align-items:center;justify-content:center;padding:14px}
+.mo.open{display:flex}
+.modal{background:var(--surf);border-radius:var(--rl);padding:20px;width:min(540px,100%);border:1px solid var(--bdr2);max-height:92vh;overflow-y:auto}
+.mtitle{font-size:15px;font-weight:500;letter-spacing:-.02em;margin-bottom:14px}
+.fr{margin-bottom:10px}
+.fr label{display:block;font-size:11px;color:var(--tx2);margin-bottom:3px}
+.fr input,.fr select,.fr textarea{width:100%;padding:6px 9px;font-size:13px;font-family:inherit;border:1px solid var(--bdr2);border-radius:var(--r);background:var(--surf2);color:var(--tx);outline:none;transition:border-color .12s}
+.fr input:focus,.fr select:focus{border-color:var(--tx);background:var(--surf)}
+.f2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.mf{display:flex;justify-content:flex-end;gap:7px;margin-top:16px}
+.notice{font-size:12px;line-height:1.5;border-radius:var(--r);padding:8px 11px;margin-bottom:11px}
+.ni{color:var(--bt);background:var(--bbg);border:1px solid rgba(24,95,165,.15)}
+.nw{color:var(--at);background:var(--abg);border:1px solid rgba(186,117,23,.15)}
+.ns{color:var(--gt);background:var(--gbg);border:1px solid rgba(29,158,117,.15)}
+.ne{color:var(--rt);background:var(--rbg);border:1px solid rgba(216,90,48,.15)}
+.ua{border:1.5px dashed var(--bdr2);border-radius:var(--rl);padding:24px;text-align:center;cursor:pointer;background:var(--surf2);transition:all .12s}
+.ua:hover{border-color:var(--tx);background:var(--bg)}
+.ua input{display:none}
+
+/* SYNC BAR */
+.syncbar{position:fixed;bottom:14px;right:14px;background:var(--surf);border:1px solid var(--bdr2);border-radius:var(--rl);padding:8px 13px;font-size:12px;display:none;align-items:center;gap:7px;box-shadow:0 4px 16px rgba(0,0,0,.07);z-index:100}
+.syncbar.show{display:flex}
+.sdot{width:6px;height:6px;border-radius:50%;background:var(--green)}
+.sdot.syncing{background:var(--amber);animation:pulse 1s infinite}
+.sdot.err{background:var(--red)}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+
+/* SETTINGS */
+.ss-section{background:var(--surf);border:1px solid var(--bdr);border-radius:var(--rl);padding:16px;margin-bottom:12px}
+.ss-title{font-size:13px;font-weight:500;margin-bottom:2px}
+.ss-sub{font-size:11px;color:var(--tx3);margin-bottom:12px}
+.irow{display:flex;gap:7px}.irow input{flex:1}
+
+/* WORKFLOW BUCKETS */
+.wf-bucket{background:var(--surf);border:1px solid var(--bdr);border-radius:var(--rl);margin-bottom:10px;overflow:hidden;transition:opacity .15s}
+.wf-bucket.dragging{opacity:.35}
+.wf-bucket.drag-over{border:1.5px dashed var(--blue);background:var(--bbg)}
+.wf-drag-handle{color:var(--tx3);font-size:13px;cursor:grab;padding:0 4px;flex-shrink:0;line-height:1}
+.wf-drag-handle:active{cursor:grabbing}
+.wf-order-badge{font-size:9px;font-weight:600;color:var(--tx3);background:var(--surf2);border:1px solid var(--bdr);border-radius:10px;padding:1px 6px;flex-shrink:0}
+.wf-bhdr{padding:10px 13px;display:flex;align-items:center;gap:9px;cursor:pointer;user-select:none;transition:background .1s}
+.wf-bhdr:hover{background:var(--surf2)}
+.wf-bdot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.wf-bname{font-size:13px;font-weight:500;flex:1}
+.wf-bcnt{font-size:11px;color:var(--tx2);background:var(--surf2);padding:1px 8px;border-radius:20px;border:1px solid var(--bdr)}
+.wf-bbtns{display:flex;gap:4px;opacity:0;transition:opacity .1s}
+.wf-bhdr:hover .wf-bbtns{opacity:1}
+.wf-bmeta{display:flex;gap:16px;padding:8px 13px;background:var(--surf2);border-bottom:1px solid var(--bdr);font-size:11px;flex-wrap:wrap}
+.wf-bmi{display:flex;flex-direction:column;gap:1px}
+.wf-bml{font-size:9.5px;color:var(--tx3);text-transform:uppercase;letter-spacing:.4px}
+.wf-bmv{font-weight:500;font-size:12px}
+.wf-bbody{display:none}
+.wf-bbody.open{display:block}
+.wf-add-bucket{border:1.5px dashed var(--bdr2);border-radius:var(--rl);padding:12px;text-align:center;cursor:pointer;color:var(--tx3);font-size:12px;transition:all .12s;margin-bottom:10px}
+.wf-add-bucket:hover{border-color:var(--tx2);color:var(--tx2);background:var(--surf)}
+
+/* BUCKET BUILDER */
+.cond-row{display:flex;gap:7px;align-items:center;margin-bottom:7px}
+.cond-row select{flex:1;padding:5px 8px;font-size:12px;font-family:inherit;border:1px solid var(--bdr2);border-radius:var(--r);background:var(--surf2);color:var(--tx);outline:none}
+.cond-row input{width:80px;padding:5px 8px;font-size:12px;font-family:inherit;border:1px solid var(--bdr2);border-radius:var(--r);background:var(--surf2);color:var(--tx);outline:none}
+.cond-row input[type=text]{width:100px}
+.cond-remove{width:22px;height:22px;border:none;background:none;color:var(--tx3);cursor:pointer;font-size:14px;border-radius:4px;flex-shrink:0;display:flex;align-items:center;justify-content:center}
+.cond-remove:hover{background:var(--rbg);color:var(--rt)}
+.add-cond-btn{display:flex;align-items:center;gap:5px;font-size:12px;color:var(--bt);background:none;border:none;cursor:pointer;padding:4px 0;font-family:inherit}
+.add-cond-btn:hover{color:var(--blue)}
+/* color swatches */
+.color-swatches{display:flex;gap:7px;flex-wrap:wrap;margin-top:4px}
+.color-swatch{width:28px;height:28px;border-radius:50%;cursor:pointer;border:2px solid transparent;transition:transform .12s,border-color .12s}
+.color-swatch:hover{transform:scale(1.15)}
+.color-swatch.selected{border-color:var(--tx)}
+
+/* EARLY PROFIT RULE indicator */
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="logo">
+    <div class="logo-icon"><svg viewBox="0 0 12 12"><polyline points="1,9 4,5.5 7,7.5 11,2"/></svg></div>
+    Wheel Tracker
+  </div>
+  <nav>
+    <button class="nbtn active" onclick="showPage('positions',this)">Positions</button>
+    <button class="nbtn" onclick="showPage('workflow',this)">Workflow</button>
+    <button class="nbtn" onclick="showPage('settings',this)">Settings</button>
+  </nav>
+  <div class="tr">
+    <span id="sync-lbl" style="font-size:11px;color:var(--tx3)"></span>
+    <span id="pos-date-lbl" style="font-size:11px;color:var(--tx3)"></span>
+    <button class="btn btn-sm btn-p" onclick="openM('import-mo')">Import Positions</button>
+  </div>
+</div>
+
+<!-- ═══ POSITIONS ═══ -->
+<div class="page active" id="page-positions">
+  <div class="ph">
+    <div class="pt">Positions</div>
+    <div class="ps" id="pos-count-lbl"></div>
+  </div>
+  <div class="sg" id="pos-stats"></div>
+  <div class="tcard">
+    <div class="toolbar">
+      <input class="si si-grow" id="pos-search" placeholder="Search symbol, sector, industry…" oninput="renderPositions()">
+      <select class="si" id="pos-type" onchange="renderPositions()">
+        <option value="">All types</option>
+        <option value="OPTION">Equity</option>
+        <option value="FUTURES_OPTION">Futures</option>
+      </select>
+      <select class="si" id="pos-cp" onchange="renderPositions()">
+        <option value="">All C/P</option>
+        <option value="Put">Put</option>
+        <option value="Call">Call</option>
+      </select>
+      <select class="si" id="pos-itm" onchange="renderPositions()">
+        <option value="">All ITM/OTM</option>
+        <option value="ITM">ITM</option>
+        <option value="ATM">ATM</option>
+        <option value="OTM">OTM</option>
+      </select>
+      <div style="position:relative">
+        <button class="btn btn-sm" id="col-panel-btn" onclick="toggleColPanel()">⊞ Columns</button>
+        <div id="col-panel" style="display:none;position:absolute;right:0;top:calc(100% + 4px);background:var(--surf);border:1px solid var(--bdr2);border-radius:var(--rl);padding:12px;z-index:100;width:220px;box-shadow:0 4px 16px rgba(0,0,0,.1)">
+          <div style="font-size:10px;font-weight:500;color:var(--tx3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Column presets</div>
+          <div style="display:flex;gap:6px;margin-bottom:12px">
+            <button class="btn btn-sm" style="flex:1" onclick="applyPreset('essential')">Essentials</button>
+            <button class="btn btn-sm" style="flex:1" onclick="applyPreset('all')">All</button>
+          </div>
+          <div style="font-size:10px;font-weight:500;color:var(--tx3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Drag to reorder</div>
+          <div id="col-checklist" style="max-height:320px;overflow-y:auto"></div>
+          <div style="margin-top:10px;border-top:1px solid var(--bdr);padding-top:8px">
+            <button class="btn btn-sm" style="width:100%;font-size:11px" onclick="resetColOrder()">Reset all</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="bulk-bar" id="bulk-bar">
+      <span class="bulk-ct"><span id="bulk-ct">0</span> selected</span>
+      <button class="btn btn-sm btn-danger" onclick="deleteSelected()">Delete selected</button>
+      <button class="btn btn-sm" onclick="clearSel()">Clear</button>
+    </div>
+    <div class="tw" id="pos-table-wrap">
+      <table id="pos-table">
+        <thead><tr id="pos-thead-row"></tr></thead>
+        <tbody id="pos-tbody"></tbody>
+      </table>
+    </div>
+    <div id="pos-empty" class="empty" style="display:none">
+      <div style="font-size:26px">📊</div>
+      <div class="et">No positions loaded</div>
+      <div style="font-size:12px">Click "Import Positions" to load your Tastytrade positions export.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ WORKFLOW ═══ -->
+<div class="page" id="page-workflow">
+  <div class="ph">
+    <div class="pt">Workflow</div>
+    <div class="ps">Positions organized by your custom action buckets</div>
+  </div>
+  <div class="sg" id="wf-stats"></div>
+  <div id="wf-buckets-list"></div>
+  <div style="display:flex;gap:8px;margin-bottom:10px;align-items:center">
+    <div class="wf-add-bucket" onclick="openBucketBuilder(null)" style="flex:1;margin-bottom:0">+ Add bucket</div>
+    <button class="btn btn-sm" onclick="resetWFCols()" style="white-space:nowrap">Reset columns</button>
+  </div>
+  <div id="wf-uncategorized"></div>
+  <div id="wf-empty" class="empty" style="display:none">
+    <div style="font-size:26px">⚡</div>
+    <div class="et">No positions loaded</div>
+  </div>
+</div>
+
+<!-- ═══ SETTINGS ═══ -->
+<div class="page" id="page-settings">
+  <div class="ph"><div class="pt">Settings</div></div>
+  <div class="ss-section">
+    <div class="ss-title">GitHub storage</div>
+    <div class="ss-sub">All data saved to your repo — syncs across devices.</div>
+    <div class="fr"><label>GitHub username</label><input id="s-user" value="kgriffen"></div>
+    <div class="fr"><label>Repository name</label><input id="s-repo" value="wheel-tracker"></div>
+    <div class="fr"><label>Personal access token</label>
+      <div class="irow"><input id="s-token" type="password" placeholder="ghp_xxxxxxxxxxxx"><button class="btn" onclick="testGH()">Test</button></div>
+    </div>
+    <div id="gh-test" style="font-size:11px;margin-top:5px"></div>
+    <div style="display:flex;gap:7px;margin-top:11px">
+      <button class="btn btn-p" onclick="saveSettings()">Save</button>
+      <button class="btn" onclick="loadFromGH()">Sync now</button>
+    </div>
+  </div>
+  <div class="ss-section">
+    <div class="ss-title">Data</div>
+    <div class="ss-sub">Export or clear all stored data.</div>
+    <div style="display:flex;gap:7px;flex-wrap:wrap">
+      <button class="btn" onclick="exportJSON()">Export JSON</button>
+      <button class="btn btn-danger" onclick="clearAll()">Clear all data</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ IMPORT MODAL ═══ -->
+<div class="mo" id="import-mo">
+  <div class="modal">
+    <div class="mtitle">Import Positions</div>
+    <div class="notice ni"><strong>This replaces all current positions.</strong> Export from Tastytrade: Positions page → export CSV. The import reads all columns directly from the file.</div>
+    <div class="ua" onclick="document.getElementById('pos-file').click()">
+      <input type="file" id="pos-file" accept=".csv" onchange="handleImport(event)">
+      <div style="font-size:22px;margin-bottom:7px">📊</div>
+      <div style="font-size:13px;color:var(--tx2)">Click to select positions CSV</div>
+      <div style="font-size:11px;color:var(--tx3);margin-top:3px">tastytrade_positions_*.csv</div>
+    </div>
+    <div id="import-result" style="margin-top:11px;font-size:12px;display:none"></div>
+    <div class="mf"><button class="btn" onclick="closeM('import-mo')">Close</button></div>
+  </div>
+</div>
+
+<!-- ═══ EDIT POSITION MODAL ═══ -->
+<div class="mo" id="edit-mo">
+  <div class="modal">
+    <div class="mtitle">Edit position</div>
+    <div class="notice nw">Manual edits are preserved on next import only if you update the stored value before re-importing.</div>
+    <input type="hidden" id="e-idx">
+    <div class="f2">
+      <div class="fr"><label>Symbol</label><input id="e-sym"></div>
+      <div class="fr"><label>Quantity</label><input id="e-qty" type="number"></div>
+    </div>
+    <div class="f2">
+      <div class="fr"><label>Strike Price</label><input id="e-strike" type="number" step="0.01"></div>
+      <div class="fr"><label>Call/Put</label><select id="e-cp"><option>Put</option><option>Call</option></select></div>
+    </div>
+    <div class="f2">
+      <div class="fr"><label>Exp Date</label><input id="e-exp" type="text" placeholder="Apr 17, 2026"></div>
+      <div class="fr"><label>DTE</label><input id="e-dte" placeholder="31d"></div>
+    </div>
+    <div class="f2">
+      <div class="fr"><label>Trade Price</label><input id="e-trdprc" type="number" step="0.0001"></div>
+      <div class="fr"><label>Mark</label><input id="e-mark" type="number" step="0.0001"></div>
+    </div>
+    <div class="f2">
+      <div class="fr"><label>P/L Open ($)</label><input id="e-plopen" type="number" step="0.01"></div>
+      <div class="fr"><label>P/L Open %</label><input id="e-plpct" placeholder="19.9%"></div>
+    </div>
+    <div class="f2">
+      <div class="fr"><label>PoP</label><input id="e-pop" placeholder="83%"></div>
+      <div class="fr"><label>IV Rank</label><input id="e-ivr" type="number" step="0.1"></div>
+    </div>
+    <div class="mf">
+      <button class="btn btn-sm btn-danger" onclick="deleteFromEdit()" style="margin-right:auto">Delete</button>
+      <button class="btn" onclick="closeM('edit-mo')">Cancel</button>
+      <button class="btn btn-p" onclick="saveEdit()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ BUCKET BUILDER MODAL ═══ -->
+<div class="mo" id="bucket-mo">
+  <div class="modal" style="width:min(560px,100%)">
+    <div class="mtitle" id="bucket-mo-title">Create bucket</div>
+    <input type="hidden" id="bkt-id">
+    <div class="fr"><label>Bucket name</label><input id="bkt-name" placeholder="e.g. Ready to Close"></div>
+    <div class="fr">
+      <label>Color</label>
+      <div class="color-swatches" id="color-swatches"></div>
+    </div>
+    <div class="fr" style="margin-top:10px">
+      <label style="margin-bottom:6px;display:block">Conditions <span style="font-weight:400;color:var(--tx3)">(all must match)</span></label>
+      <div id="cond-rows"></div>
+      <button class="add-cond-btn" onclick="addCondRow()">+ Add condition</button>
+    </div>
+    <div class="mf">
+      <button class="btn btn-sm btn-danger" id="bkt-delete-btn" onclick="deleteBucket()" style="margin-right:auto;display:none">Delete bucket</button>
+      <button class="btn" onclick="closeM('bucket-mo')">Cancel</button>
+      <button class="btn btn-p" onclick="saveBucket()">Save bucket</button>
+    </div>
+  </div>
+</div>
+
+<!-- SYNC BAR -->
+<div class="syncbar" id="syncbar">
+  <div class="sdot" id="sdot"></div>
+  <span id="smsg"></span>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════════════
+let positions = [];          // raw objects from CSV, all columns preserved
+let buckets = [];            // workflow bucket definitions
+let colOrder = [];           // column display order (array of col keys)
+let colWidths = {};          // { colKey: widthPx }
+let colHidden = {};           // { colKey: true } = hidden
+let selectedIdx = new Set(); // selected row indices (into filtered list)
+let ghCfg = { user:'kgriffen', repo:'wheel-tracker', token:'' };
+let ghSha = null;
+let posImportDate = '';
+let sortState = { col:'', asc:true };
+let wfColOrder = [];    // workflow column order
+let wfColWidths = {};   // workflow column widths
+let wfColHidden = {};   // workflow hidden columns
+let wfSortState = {};   // { bucketId: { col, asc } }
+
+const SWATCH_COLORS = ['#7F77DD','#1D9E75','#EF9F27','#D85A30','#185FA5','#E87B3B','#0F9B8E','#D4537E'];
+
+// ═══════════════════════════════════════════════════════════
+// DEFAULT BUCKETS (from trading plan)
+// ═══════════════════════════════════════════════════════════
+const DEFAULT_BUCKETS = [
+  {
+    id:'b-urgent', name:'Urgent', color:'#D85A30',
+    conditions:[{field:'pop',op:'<',value:'50'}]
+  },
+  {
+    id:'b-take-profits', name:'Take Profits', color:'#7F77DD',
+    conditions:[{field:'pl_pct',op:'>=',value:'50'}]
+  },
+  {
+    id:'b-early-close', name:'Early Close Rule', color:'#1D9E75',
+    conditions:[{field:'early_profit',op:'=',value:'true'}]
+  },
+  {
+    id:'b-warning', name:'Warning', color:'#EF9F27',
+    conditions:[{field:'pop',op:'<',value:'65'}]
+  },
+  {
+    id:'b-working', name:'Working', color:'#185FA5',
+    conditions:[{field:'itm_otm',op:'=',value:'OTM'},{field:'pop',op:'>=',value:'65'}]
+  }
+];
+
+// ═══════════════════════════════════════════════════════════
+// COLUMN DEFINITIONS
+// ═══════════════════════════════════════════════════════════
+const ALL_COLS = [
+  {key:'_cb',       label:'',          width:28,  sortable:false, fixed:true},
+  {key:'Symbol',    label:'Symbol',    width:160, sortable:true,  fmt:'symbol'},
+  {key:'_bucket',   label:'Bucket',    width:110, sortable:true,  fmt:'bucket'},
+  {key:'_type',     label:'Type',      width:145, sortable:true,  fmt:'strategy-tag'},
+  {key:'Type',      label:'Type',      width:80,  sortable:true,  fmt:'type-badge'},
+  {key:'Call/Put',  label:'C/P',       width:44,  sortable:true,  fmt:'cp-badge'},
+  {key:'Quantity',  label:'Qty',       width:44,  sortable:true,  fmt:'qty'},
+  {key:'Strike Price', label:'Strike', width:72,  sortable:true,  fmt:'price4'},
+  {key:'Exp Date',  label:'Exp Date',  width:95,  sortable:true,  fmt:'text'},
+  {key:'DTE',       label:'DTE',       width:44,  sortable:true,  fmt:'dte'},
+  {key:"D's Opn",   label:"D's Opn",  width:52,  sortable:true,  fmt:'days'},
+  {key:'Trade Price', label:'Trd Prc', width:68,  sortable:true,  fmt:'price4'},
+  {key:'Mark',      label:'Mark',      width:68,  sortable:true,  fmt:'price4'},
+  {key:'Cost',      label:'Cost',      width:75,  sortable:true,  fmt:'money'},
+  {key:'Ext',       label:'Ext Val',   width:75,  sortable:true,  fmt:'money'},
+  {key:'_ann_yield',label:'Ann Yield', width:70,  sortable:true,  fmt:'ann-yield'},
+  {key:'_capital',  label:'Notional',  width:80,  sortable:true,  fmt:'capital'},
+  {key:'P/L Open',  label:'P/L $',     width:75,  sortable:true,  fmt:'pl-money'},
+  {key:'P/L Opn%',  label:'P/L %',     width:60,  sortable:true,  fmt:'pl-pct'},
+  {key:'_pae',      label:'PAE $',      width:75,  sortable:true,  fmt:'pae-money'},
+  {key:'_pae_pct',  label:'PAE %',      width:58,  sortable:true,  fmt:'pae-pct'},
+  {key:'P/L Day',   label:'P/L Day',   width:65,  sortable:true,  fmt:'pl-money'},
+  {key:'PoP',       label:'PoP',       width:50,  sortable:true,  fmt:'pop'},
+  {key:'IV Rank',   label:'IV Rank',   width:55,  sortable:true,  fmt:'num1'},
+  {key:'Theta',     label:'Theta',     width:58,  sortable:true,  fmt:'num2'},
+  {key:'β Delta',   label:'β Δ',       width:58,  sortable:true,  fmt:'num2'},
+  {key:'/ Delta',   label:'Δ',         width:58,  sortable:true,  fmt:'num2'},
+  {key:'Underlying Last Price', label:'Underlying', width:85, sortable:true, fmt:'price2'},
+  {key:'Vega',      label:'Vega',      width:58,  sortable:true,  fmt:'num2'},
+  {key:'Gamma',     label:'Gamma',     width:58,  sortable:true,  fmt:'num3'},
+  {key:'Beta',      label:'Beta',      width:50,  sortable:true,  fmt:'num2'},
+  {key:'P/L YTD',   label:'YTD P/L',   width:65,  sortable:true,  fmt:'pl-money'},
+  {key:'IV Idx 5d Chg', label:'IV 5d',  width:55, sortable:true,  fmt:'pct-chg'},
+  {key:'Ext RoR %', label:'Ext RoR',   width:58,  sortable:true,  fmt:'pct'},
+  {key:'Sector',    label:'Sector',    width:110, sortable:true,  fmt:'text'},
+  {key:'Industry',  label:'Industry',  width:140, sortable:true,  fmt:'text'},
+  {key:'_actions',  label:'',          width:56,  sortable:false, fixed:true},
+];
+
+// ═══════════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════════
+window.addEventListener('DOMContentLoaded', () => {
+  try { const s=localStorage.getItem('wt_cfg'); if(s) ghCfg={...ghCfg,...JSON.parse(s)}; } catch(e){}
+  document.getElementById('s-user').value = ghCfg.user;
+  document.getElementById('s-repo').value = ghCfg.repo;
+  document.getElementById('s-token').value = ghCfg.token;
+  initColOrder();
+  loadFromGH();
+});
+
+function initColOrder() {
+  colOrder = ALL_COLS.map(c=>c.key);
+}
+
+// ═══════════════════════════════════════════════════════════
+// GITHUB
+// ═══════════════════════════════════════════════════════════
+const GH_FILE='positions.json';
+const ghUrl=()=>`https://api.github.com/repos/${ghCfg.user}/${ghCfg.repo}/contents/${GH_FILE}`;
+const ghH=()=>({'Authorization':'token '+ghCfg.token,'Accept':'application/vnd.github.v3+json','Content-Type':'application/json'});
+
+async function loadFromGH(){
+  if(!ghCfg.token){loadLocal();return;}
+  showSync('syncing','Loading…');
+  try{
+    const r=await fetch(ghUrl(),{headers:ghH()});
+    if(r.status===404){loadLocal();showSync('ok','GitHub connected');return;}
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    const d=await r.json();
+    ghSha=d.sha;
+    const p=JSON.parse(atob(d.content.replace(/\n/g,'')));
+    positions=p.positions||[];
+    buckets=p.buckets||DEFAULT_BUCKETS;
+    colWidths=p.colWidths||{};
+    colHidden=p.colHidden||{};
+    posImportDate=p.posImportDate||'';
+    wfColOrder=p.wfColOrder||[];
+    wfColWidths=p.wfColWidths||{};
+    wfColHidden=p.wfColHidden||{};
+    localStorage.setItem('wt_data',JSON.stringify({positions,buckets,colWidths,colHidden,posImportDate,wfColOrder,wfColWidths,wfColHidden}));
+    showSync('ok','Synced ✓');
+    sanitizeColState();
+    migrateBucketOrder();
+    renderAll();
+  }catch(e){loadLocal();showSync('err','GitHub error — using local');}
+}
+
+function loadLocal(){
+  try{
+    const d=JSON.parse(localStorage.getItem('wt_data')||'{}');
+    positions=d.positions||[];
+    buckets=d.buckets&&d.buckets.length?d.buckets:DEFAULT_BUCKETS;
+    colWidths=d.colWidths||{};
+    colHidden=d.colHidden||{};
+    posImportDate=d.posImportDate||'';
+    wfColOrder=d.wfColOrder||[];
+    wfColWidths=d.wfColWidths||{};
+    wfColHidden=d.wfColHidden||{};
+  }catch(e){positions=[];buckets=DEFAULT_BUCKETS;colWidths={};}
+  sanitizeColState();
+  migrateBucketOrder();
+  renderAll();
+}
+
+async function saveToGH(){
+  const data={positions,buckets,colWidths,colHidden,posImportDate,wfColOrder,wfColWidths,wfColHidden,updated:new Date().toISOString()};
+  localStorage.setItem('wt_data',JSON.stringify(data));
+  if(!ghCfg.token)return;
+  showSync('syncing','Saving…');
+  try{
+    const content=btoa(unescape(encodeURIComponent(JSON.stringify(data,null,2))));
+    const body={message:'Update positions '+today(),content};
+    if(ghSha)body.sha=ghSha;
+    const r=await fetch(ghUrl(),{method:'PUT',headers:ghH(),body:JSON.stringify(body)});
+    if(!r.ok)throw new Error('HTTP '+r.status);
+    const d=await r.json();
+    ghSha=d.content?.sha;
+    showSync('ok','Saved ✓');
+  }catch(e){showSync('err','Save failed — stored locally');}
+}
+
+async function testGH(){
+  const u=document.getElementById('s-user').value.trim();
+  const rp=document.getElementById('s-repo').value.trim();
+  const tk=document.getElementById('s-token').value.trim();
+  const el=document.getElementById('gh-test');
+  el.textContent='Testing…';el.style.color='var(--tx3)';
+  try{
+    const r=await fetch(`https://api.github.com/repos/${u}/${rp}`,{headers:{'Authorization':'token '+tk,'Accept':'application/vnd.github.v3+json'}});
+    el.textContent=r.ok?'✓ Connected':'✗ Failed ('+r.status+')';
+    el.style.color=r.ok?'var(--green)':'var(--red)';
+  }catch(e){el.textContent='✗ Network error';el.style.color='var(--red)';}
+}
+
+function saveSettings(){
+  ghCfg.user=document.getElementById('s-user').value.trim();
+  ghCfg.repo=document.getElementById('s-repo').value.trim();
+  ghCfg.token=document.getElementById('s-token').value.trim();
+  localStorage.setItem('wt_cfg',JSON.stringify(ghCfg));
+  loadFromGH();
+}
+
+function showSync(state,msg){
+  const bar=document.getElementById('syncbar'),dot=document.getElementById('sdot');
+  dot.className='sdot'+(state==='syncing'?' syncing':state==='err'?' err':'');
+  document.getElementById('smsg').textContent=msg;
+  document.getElementById('sync-lbl').textContent=state==='ok'?'GitHub ✓':state==='err'?'Local only':'';
+  bar.classList.add('show');
+  if(state!=='syncing')setTimeout(()=>bar.classList.remove('show'),3000);
+}
+
+// ═══════════════════════════════════════════════════════════
+// HELPERS
+// ═══════════════════════════════════════════════════════════
+function today(){return new Date().toISOString().split('T')[0];}
+
+function cleanNum(s){
+  if(s===null||s===undefined||s==='--'||s==='') return null;
+  const n=parseFloat(String(s).replace(/[$,%]/g,'').replace(/,/g,''));
+  return isNaN(n)?null:n;
+}
+
+function parseDays(s){
+  if(!s||s==='--') return null;
+  const n=parseInt(String(s).replace('d',''));
+  return isNaN(n)?null:n;
+}
+
+// Derived fields computed per-position
+function deriveFields(p){
+  const strike=cleanNum(p['Strike Price']);
+  const last=cleanNum(p['Underlying Last Price']);
+  const cp=p['Call/Put']||'';
+  const dte=parseDays(p['DTE']);
+  const daysOpn=parseDays(p["D's Opn"]);
+  const plOpen=cleanNum(p['P/L Open']);
+  const plPct=cleanNum(p['P/L Opn%']);
+  const cost=cleanNum(p['Cost']);
+  const pop=cleanNum(p['PoP']);
+  const qty=cleanNum(p['Quantity']);
+
+  // ITM/OTM/ATM
+  let itmOtm=null;
+  let strikeDist=null;
+  if(strike!=null&&last!=null&&last!==0){
+    strikeDist=((strike-last)/last)*100;
+    if(cp==='Put'){
+      if(strike>last*1.005) itmOtm='ITM';
+      else if(strike<last*0.995) itmOtm='OTM';
+      else itmOtm='ATM';
+    } else {
+      if(strike<last*0.995) itmOtm='ITM';
+      else if(strike>last*1.005) itmOtm='OTM';
+      else itmOtm='ATM';
+    }
+  }
+
+  // Early profit rule: P/L >= $50 AND (P/L/DaysOpn) > (|Cost|/(DTE+DaysOpn))
+  let earlyProfit=false;
+  if(plOpen!=null&&plOpen>=50&&daysOpn&&daysOpn>0&&cost!=null&&dte!=null){
+    const absC=Math.abs(cost);
+    const vel=plOpen/daysOpn;
+    const maxVel=absC/(dte+daysOpn);
+    earlyProfit=vel>maxVel;
+  }
+
+  // Profit At Expiration — assumes underlying holds current price to expiry
+  // Short: PAE = credit received - intrinsic loss at expiry
+  // Long:  PAE = intrinsic value at expiry - debit paid
+  let pae=null, paePct=null;
+  if((p['Type']||'')!=='FUTURES_OPTION' && qty!==null && strike!==null && last!==null && last>0 && cost!==null){
+    const cp2=p['Call/Put']||'';
+    const intrinsic=cp2==='Put'?Math.max(0,strike-last):Math.max(0,last-strike);
+    if(qty<0 && cost>0){
+      // Short: credit collected minus intrinsic loss
+      pae=Math.round((cost-(intrinsic*Math.abs(qty)*100))*100)/100;
+      paePct=Math.round((pae/cost)*1000)/10;
+    } else if(qty>0){
+      // Long: intrinsic value received minus debit paid
+      const absCost=Math.abs(cost);
+      pae=Math.round(((intrinsic*Math.abs(qty)*100)-absCost)*100)/100;
+      paePct=absCost>0?Math.round((pae/absCost)*1000)/10:null;
+    }
+  }
+
+  // Ann Yield: (Cost / Capital) * (365 / (DTE + DaysOpn)) * 100
+  // Exclude futures — their strike values are FX rates/index points not dollar strikes
+  let _annYield = null;
+  const _isFutures = (p['Type']||'') === 'FUTURES_OPTION';
+  if(!_isFutures && cost && cost > 0 && dte !== null && daysOpn !== null && (dte + daysOpn) > 0 && strike && qty) {
+    const capital = Math.abs(strike) * 100 * Math.abs(qty);
+    if(capital > 0) _annYield = Math.round((cost / capital) * (365 / (dte + daysOpn)) * 100 * 10) / 10;
+  }
+
+  // Capital used: strike * 100 * |qty| for equity options only
+  const _capital = (strike && qty && !_isFutures)
+    ? Math.abs(strike) * 100 * Math.abs(qty)
+    : null;
+
+  // Strategy type for single positions (spread type set at render time)
+  const _stratType = classifyLegs([p]);
+
+  return {itmOtm,strikeDist,earlyProfit,pae,paePct,_annYield,_capital,_stratType,
+    _dte:dte,_daysOpn:daysOpn,_plOpen:plOpen,_plPct:plPct,_cost:cost,_pop:pop,_qty:qty,_strike:strike,_last:last};
+}
+
+// ═══════════════════════════════════════════════════════════
+// IMPORT CSV
+// ═══════════════════════════════════════════════════════════
+function handleImport(e){
+  const file=e.target.files[0]; if(!file) return;
+  const reader=new FileReader();
+  reader.onload=ev=>{
+    const lines=ev.target.result.split('\n').map(l=>l.trim()).filter(Boolean);
+    if(lines.length<2){showImportResult('error','File appears empty.');return;}
+    const headers=parseCsvLine(lines[0]);
+    const rows=[];
+    for(let i=1;i<lines.length;i++){
+      const cols=parseCsvLine(lines[i]);
+      if(cols.length<3) continue;
+      const row={};
+      headers.forEach((h,j)=>row[h.trim()]=(cols[j]||'').trim());
+      if(!row['Symbol']) continue;
+      rows.push(row);
+    }
+    positions=rows;
+    posImportDate=new Date().toLocaleString();
+    document.getElementById('pos-date-lbl').textContent='Imported: '+today();
+    showImportResult('ok',`✓ Loaded ${rows.length} positions. Previous data replaced.`);
+    saveToGH();
+    renderAll();
+    e.target.value='';
+  };
+  reader.readAsText(file);
+}
+
+function showImportResult(type,msg){
+  const el=document.getElementById('import-result');
+  el.style.display='block';
+  el.style.color=type==='ok'?'var(--green)':'var(--red)';
+  el.textContent=msg;
+}
+
+function parseCsvLine(line){
+  const res=[];let cur='',inQ=false;
+  for(let i=0;i<line.length;i++){
+    const c=line[i];
+    if(c==='"'){inQ=!inQ;}
+    else if(c===','&&!inQ){res.push(cur.trim());cur='';}
+    else cur+=c;
+  }
+  res.push(cur.trim());return res;
+}
+
+// ═══════════════════════════════════════════════════════════
+// CELL FORMATTERS
+// ═══════════════════════════════════════════════════════════
+function fmtCell(col,val,derived,pos){
+  if(val===undefined||val===null||val==='--'||val===''){
+    if(col.key==='_cb') return '<input type="checkbox" class="row-cb">';
+    if(col.key==='_actions') return '';
+    return '<span style="color:var(--tx3)">—</span>';
+  }
+
+  switch(col.fmt){
+    case 'symbol':{
+      const isFut=String(val).startsWith('./');
+      const futTag=isFut?'<span style="font-size:9px;background:var(--pbg);color:var(--pt);padding:1px 5px;border-radius:8px;margin-left:3px;font-weight:500">FUT</span>':'';
+      return `<strong style="font-size:11px">${val}</strong>${futTag}`;
+    }
+    case 'type-badge':{
+      const isFut=val==='FUTURES_OPTION';
+      return `<span class="badge ${isFut?'bp':'bgy'}">${isFut?'Fut':'Eq'}</span>`;
+    }
+    case 'cp-badge':
+      return val==='Put'?'<span class="badge br">P</span>':'<span class="badge bg">C</span>';
+    case 'qty':{
+      const n=cleanNum(val);
+      const cls=n<0?'cr':n>0?'cg':'';
+      return `<span class="mono ${cls}">${val}</span>`;
+    }
+    case 'price2':{
+      const n=cleanNum(val);
+      if(n===null) return '—';
+      return `<span class="mono">${n.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}</span>`;
+    }
+    case 'price4':{
+      const n=cleanNum(val);
+      if(n===null) return '—';
+      const abs=Math.abs(n);
+      // Auto-precision: if small number use more decimals
+      const dec=abs<1?4:abs<10?3:2;
+      return `<span class="mono">${n.toLocaleString('en-US',{minimumFractionDigits:dec,maximumFractionDigits:dec})}</span>`;
+    }
+    case 'money':{
+      const n=cleanNum(val);
+      if(n===null) return '—';
+      const cls=n>=0?'cg':'cr';
+      const abs=Math.abs(n).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+      return `<span class="mono ${cls}">${n>=0?'':'-'}$${abs}</span>`;
+    }
+    case 'pl-money':{
+      const n=cleanNum(val);
+      if(n===null) return '—';
+      const cls=n>=0?'cg':'cr';
+      const abs=Math.abs(n).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+      return `<span class="mono ${cls}">${n>=0?'+':'-'}$${abs}</span>`;
+    }
+    case 'pl-pct':{
+      const n=cleanNum(val);
+      if(n===null) return '—';
+      const cls=n>=0?'cg':'cr';
+      return `<span class="mono ${cls}">${n>=0?'+':''}${n.toFixed(1)}%</span>`;
+    }
+    case 'pop':{
+      const n=cleanNum(val);
+      if(n===null) return '—';
+      const cls=n>=65?'cg':n>=50?'ca':'cr';
+      return `<span class="mono ${cls} " style="font-weight:500">${n.toFixed(0)}%</span>`;
+    }
+    case 'dte':{
+      const n=parseDays(val);
+      if(n===null) return '—';
+      const cls=n<=7?'cr':n<=14?'ca':'';
+      return `<span class="mono ${cls}">${n}d</span>`;
+    }
+    case 'days':
+      return `<span class="mono">${val}</span>`;
+    case 'pct':{
+      const n=cleanNum(val);
+      if(n===null) return '—';
+      return `<span class="mono">${n.toFixed(1)}%</span>`;
+    }
+    case 'pct-chg':{
+      const n=cleanNum(val);
+      if(n===null) return '—';
+      const cls=n>0?'cg':n<0?'cr':'';
+      return `<span class="mono ${cls}">${n>0?'+':''}${n.toFixed(1)}%</span>`;
+    }
+    case 'num1':{
+      const n=cleanNum(val);
+      return n===null?'—':`<span class="mono">${n.toFixed(1)}</span>`;
+    }
+    case 'num2':{
+      const n=cleanNum(val);
+      return n===null?'—':`<span class="mono">${n.toFixed(2)}</span>`;
+    }
+    case 'num3':{
+      const n=cleanNum(val);
+      return n===null?'—':`<span class="mono">${n.toFixed(3)}</span>`;
+    }
+    case 'bucket':{
+      const bucket=pos?getBucketForPosition(pos):null;
+      if(!bucket) return '<span style="color:var(--tx3);font-size:11px">—</span>';
+      return `<span style="font-size:10px;padding:2px 7px;border-radius:8px;font-weight:500;white-space:nowrap;background:${hexToRgba(bucket.color,0.13)};color:${bucket.color};border:1px solid ${hexToRgba(bucket.color,0.28)}">${bucket.name}</span>`;
+    }
+    case 'strategy-tag':{
+      // val is sentinel '__type__', actual type from derived
+      if(val==='__type__') return derived?._stratType?strategyTag(derived._stratType):'<span style="color:var(--tx3)">—</span>';
+      // Also handle when called directly with a type string (WF table)
+      return strategyTag(String(val));
+    }
+    case 'ann-yield':{
+      if(val==='__ann_yield__'){
+        const n=derived?._annYield;
+        if(n===null||n===undefined) return '<span style="color:var(--tx3)">—</span>';
+        const cls=n>=20?'cg':n>=10?'ca':'';
+        return `<span class="mono ${cls}">${n.toFixed(1)}%</span>`;
+      }
+      return '<span style="color:var(--tx3)">—</span>';
+    }
+    case 'pae-money':{
+      if(val==='__pae__'){
+        if(derived?.pae===null||derived?.pae===undefined) return '<span style="color:var(--tx3)">—</span>';
+        const n=derived.pae;
+        const cls=n>=0?'cg':'cr';
+        const abs=Math.abs(n).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+        return `<span class="mono ${cls}">${n>=0?'+$':'-$'}${abs}</span>`;
+      }
+      return '<span style="color:var(--tx3)">—</span>';
+    }
+    case 'pae-pct':{
+      if(val==='__pae_pct__'){
+        if(derived?.paePct===null||derived?.paePct===undefined) return '<span style="color:var(--tx3)">—</span>';
+        const n=derived.paePct;
+        const cls=n>=100?'cg':n>=1?'ca':'cr';
+        return `<span class="mono ${cls}" style="font-weight:500">${n.toFixed(1)}%</span>`;
+      }
+      return '<span style="color:var(--tx3)">—</span>';
+    }
+    case 'capital':{
+      const n = val==='__capital__' ? derived?._capital : cleanNum(val);
+      if(n===null||n===undefined) return '<span style="color:var(--tx3)">—</span>';
+      return `<span class="mono">$${n.toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:0})}</span>`;
+    }
+    default:
+      return `<span style="font-size:12px">${val}</span>`;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// POSITIONS TABLE
+// ═══════════════════════════════════════════════════════════
+function getFilteredPositions(){
+  const q=(document.getElementById('pos-search')?.value||'').toLowerCase();
+  const tf=document.getElementById('pos-type')?.value||'';
+  const cpf=document.getElementById('pos-cp')?.value||'';
+  const itmf=document.getElementById('pos-itm')?.value||'';
+
+  let list=positions.filter(p=>{
+    if(tf&&p['Type']!==tf)return false;
+    if(cpf&&p['Call/Put']!==cpf)return false;
+    if(q&&!JSON.stringify(p).toLowerCase().includes(q))return false;
+    if(itmf){const d=deriveFields(p);if(d.itmOtm!==itmf)return false;}
+    return true;
+  });
+
+  if(sortState.col){
+    list=[...list].sort((a,b)=>{
+      const av=sortVal(a,sortState.col);
+      const bv=sortVal(b,sortState.col);
+      if(av===null)return 1;if(bv===null)return -1;
+      return (av<bv?-1:av>bv?1:0)*(sortState.asc?1:-1);
+    });
+  }
+  return list;
+}
+
+function sortVal(p,colKey){
+  if(colKey==='_pae'||colKey==='_pae_pct'||colKey==='_ann_yield'||colKey==='_capital'||colKey==='_type'){
+    const d=deriveFields(p);
+    if(colKey==='_pae') return d.pae;
+    if(colKey==='_pae_pct') return d.paePct;
+    if(colKey==='_ann_yield') return d._annYield;
+    if(colKey==='_capital') return d._capital;
+    if(colKey==='_type') return d._stratType||'';
+  }
+  if(colKey==='_bucket'){
+    const b=getBucketForPosition(p);
+    if(!b) return 'zzz'; // uncategorized sorts last
+    return String(buckets.findIndex(x=>x.id===b.id)).padStart(3,'0');
+  }
+  const col=ALL_COLS.find(c=>c.key===colKey);
+  if(!col)return null;
+  const val=p[colKey];
+  if(col.fmt==='dte'||col.fmt==='days')return parseDays(val);
+  if(['money','pl-money','pl-pct','pop','num1','num2','num3','pct','pct-chg','price2','price4','qty'].includes(col.fmt))return cleanNum(val);
+  if(col.fmt==='symbol')return String(val||'').toLowerCase();
+  return String(val||'').toLowerCase();
+}
+
+function renderPositions(){
+  if(!positions.length){
+    document.getElementById('pos-empty').style.display='block';
+    document.getElementById('pos-table').style.display='none';
+    document.getElementById('pos-count-lbl').textContent='';
+    renderPosStats([]);
+    return;
+  }
+  document.getElementById('pos-empty').style.display='none';
+  document.getElementById('pos-table').style.display='';
+
+  const list=getFilteredPositions();
+  document.getElementById('pos-count-lbl').textContent=list.length+' positions'+(posImportDate?' · '+posImportDate:'');
+
+  renderPosStats(list);
+  renderPosHeader();
+  renderPosBody(list);
+}
+
+function renderPosStats(list){
+  const all=list.length?list:positions;
+  const shorts=all.filter(p=>cleanNum(p['Quantity'])<0);
+  const totalCost=shorts.reduce((s,p)=>s+(cleanNum(p['Cost'])||0),0);
+  const totalPL=all.reduce((s,p)=>s+(cleanNum(p['P/L Open'])||0),0);
+  // Notional exposure: use unique short legs only (avoid double-counting spread legs)
+  // buildDisplayItems groups spreads, so we sum from the flat unique positions set
+  const uniqueShorts=new Set();
+  buildDisplayItems(all).forEach(item=>item.legs.forEach(l=>{
+    if(cleanNum(l['Quantity'])<0) uniqueShorts.add(l);
+  }));
+  const totalCapital=[...uniqueShorts].reduce((s,p)=>{
+    const str=cleanNum(p['Strike Price']),qty=Math.abs(cleanNum(p['Quantity'])||0);
+    const isF=(p['Type']||'')==='FUTURES_OPTION';
+    return s+(!isF&&str?str*100*qty:0);
+  },0);
+  const annYield=totalCapital>0?Math.round((totalCost/totalCapital)*365/45*100*10)/10:null; // ~45d avg assumption
+  // Avg ann yield — equity only, exclude outliers > 500% (data anomalies)
+  let wAnnYield=null;
+  const yieldSamples=shorts
+    .filter(p=>(p['Type']||'')!=='FUTURES_OPTION')
+    .map(p=>deriveFields(p)._annYield)
+    .filter(n=>n!==null && n<=500 && n>=0);
+  if(yieldSamples.length) wAnnYield=Math.round(yieldSamples.reduce((s,n)=>s+n,0)/yieldSamples.length*10)/10;
+
+  const avgPop=()=>{const ps=all.filter(p=>cleanNum(p['PoP'])!=null);return ps.length?Math.round(ps.reduce((s,p)=>s+(cleanNum(p['PoP'])||0),0)/ps.length):null;};
+  const itmCount=all.filter(p=>deriveFields(p).itmOtm==='ITM').length;
+  const earlyClose=all.filter(p=>deriveFields(p).earlyProfit).length;
+  const pop=avgPop();
+  document.getElementById('pos-stats').innerHTML=`
+    <div class="stat"><div class="sl">Positions</div><div class="sv">${shorts.length} <span style="font-size:13px;color:var(--tx3)">short</span></div><div class="ss">${all.length} total</div></div>
+    <div class="stat"><div class="sl">Total premium</div><div class="sv cg" style="font-size:16px">${fmt$(totalCost)}</div></div>
+    <div class="stat"><div class="sl">Notional exposure</div><div class="sv cg" style="font-size:16px">${totalCapital>0?fmt$(totalCapital):'—'}</div></div>
+    <div class="stat"><div class="sl">Avg ann yield</div><div class="sv ${wAnnYield>=20?'cg':wAnnYield>=10?'ca':''}">${wAnnYield!==null?wAnnYield+'%':'—'}</div></div>
+    <div class="stat"><div class="sl">P/L Open</div><div class="sv ${totalPL>=0?'cg':'cr'}" style="font-size:16px">${fmt$(totalPL,true)}</div></div>
+    <div class="stat"><div class="sl">Avg PoP</div><div class="sv ${pop>=65?'cg':pop>=50?'ca':'cr'}">${pop!==null?pop+'%':'—'}</div></div>
+    <div class="stat"><div class="sl">ITM</div><div class="sv ${itmCount>0?'cr':'cg'}">${itmCount}</div><div class="ss">of ${all.length}</div></div>
+    ${earlyClose>0?`<div class="stat"><div class="sl">Early close ⚡</div><div class="sv cb">${earlyClose}</div><div class="ss">rule met</div></div>`:''}
+  `;
+}
+
+function renderPosHeader(){
+  const tr=document.getElementById('pos-thead-row');
+  tr.innerHTML='';
+  const cols=colOrder.map(k=>ALL_COLS.find(c=>c.key===k)).filter(Boolean).filter(c=>c.fixed||!colHidden[c.key]);
+  cols.forEach((col,i)=>{
+    const th=document.createElement('th');
+    const w=colWidths[col.key]||col.width;
+    th.style.width=w+'px';th.style.minWidth=w+'px';th.style.maxWidth=w+'px';
+    th.dataset.col=col.key;
+    if(col.key==='_cb'){
+      th.className='cb-col';
+      th.style.cursor='default';
+      th.innerHTML='<input type="checkbox" id="select-all" onchange="toggleAll(this)">';
+      tr.appendChild(th);return;
+    }
+    if(col.key==='_actions'){th.innerHTML='';tr.appendChild(th);return;}
+
+    const arrow=col.sortable?`<span class="sort-arrow ${sortState.col===col.key?'active':''}">${sortState.col===col.key?(sortState.asc?'▲':'▼'):'↕'}</span>`:'';
+    th.innerHTML=`${col.label}${arrow}<div class="resize-handle"></div>`;
+    if(col.sortable){
+      th.classList.add('sortable');
+      th.addEventListener('click',e=>{
+        if(e.target.classList.contains('resize-handle'))return;
+        if(sortState.col===col.key)sortState.asc=!sortState.asc;
+        else{sortState.col=col.key;sortState.asc=true;}
+        renderPositions();
+      });
+    }
+    // Resize
+    const handle=th.querySelector('.resize-handle');
+    handle.addEventListener('mousedown',e=>{
+      e.stopPropagation();e.preventDefault();
+      const startX=e.clientX;
+      const startW=colWidths[col.key]||col.width;
+      handle.classList.add('dragging');
+      const onMove=e=>{
+        const newW=Math.max(40,startW+e.clientX-startX);
+        colWidths[col.key]=newW;
+        th.style.width=newW+'px';th.style.minWidth=newW+'px';th.style.maxWidth=newW+'px';
+        // update matching body cells
+        document.querySelectorAll(`#pos-tbody td[data-col="${col.key}"]`).forEach(td=>{
+          td.style.width=newW+'px';td.style.minWidth=newW+'px';td.style.maxWidth=newW+'px';
+        });
+      };
+      const onUp=()=>{
+        handle.classList.remove('dragging');
+        document.removeEventListener('mousemove',onMove);
+        document.removeEventListener('mouseup',onUp);
+        saveToGH();
+      };
+      document.addEventListener('mousemove',onMove);
+      document.addEventListener('mouseup',onUp);
+    });
+    // Drag reorder
+    th.setAttribute('draggable','true');
+    th.addEventListener('dragstart',e=>{e.dataTransfer.setData('text/plain',col.key);th.classList.add('dragging-col');});
+    th.addEventListener('dragend',()=>th.classList.remove('dragging-col'));
+    th.addEventListener('dragover',e=>{e.preventDefault();th.classList.add('drag-over');});
+    th.addEventListener('dragleave',()=>th.classList.remove('drag-over'));
+    th.addEventListener('drop',e=>{
+      e.preventDefault();th.classList.remove('drag-over');
+      const fromKey=e.dataTransfer.getData('text/plain');
+      const toKey=col.key;
+      if(fromKey===toKey)return;
+      const fi=colOrder.indexOf(fromKey);
+      const ti=colOrder.indexOf(toKey);
+      if(fi<0||ti<0)return;
+      colOrder.splice(fi,1);
+      colOrder.splice(ti,0,fromKey);
+      renderPositions();
+      saveToGH();
+    });
+    tr.appendChild(th);
+  });
+}
+
+function renderPosBody(list){
+  const tbody=document.getElementById('pos-tbody');
+  const cols=colOrder.map(k=>ALL_COLS.find(c=>c.key===k)).filter(Boolean).filter(c=>c.fixed||!colHidden[c.key]);
+  const items=buildDisplayItems(list);
+  const rows=[];
+
+  items.forEach((item, itemIdx) => {
+    if(!item.isSpread){
+      // Single position row
+      const p=item.position;
+      const ri=list.indexOf(p);
+      const derived=Object.assign({},deriveFields(p),{_stratType:item.type});
+      const bucket=getBucketForItem(item);
+      const sel=selectedIdx.has(ri);
+      const cells=cols.map(col=>{
+        const w=colWidths[col.key]||col.width;
+        const style=`width:${w}px;min-width:${w}px;max-width:${w}px`;
+        if(col.key==='_cb') return `<td class="cb-col" data-col="_cb" style="${style}"><input type="checkbox" class="row-cb" data-ri="${ri}" ${sel?'checked':''} onchange="onRowCheck(this)"></td>`;
+        if(col.key==='_actions') return `<td data-col="_actions" style="${style};text-align:center"><button class="btn btn-sm" style="padding:2px 7px;font-size:11px" onclick="openEdit(${ri})">Edit</button></td>`;
+        const val=col.key==='_bucket'?'__bucket__':col.key==='_type'?'__type__':col.key==='_pae'?'__pae__':col.key==='_pae_pct'?'__pae_pct__':col.key==='_ann_yield'?'__ann_yield__':col.key==='_capital'?'__capital__':p[col.key];
+        // Override bucket rendering with item's bucket
+        if(col.key==='_bucket') return `<td data-col="${col.key}" style="${style}">${bucketTag(bucket)}</td>`;
+        const html=fmtCell(col,val,derived,p);
+        const align=['money','pl-money','pl-pct','pop','num1','num2','num3','pct','pct-chg','price2','price4','qty','dte','days'].includes(col.fmt)?'text-align:right':'';
+        return `<td data-col="${col.key}" style="${style};${align}" title="${String(val||'').replace(/"/g,'&quot;')}">${html}</td>`;
+      }).join('');
+      rows.push(`<tr data-ri="${ri}" class="${sel?'selected':''}">${cells}</tr>`);
+    } else {
+      // Spread parent row (collapsed by default, expandable)
+      const agg=spreadAggregate(item.legs);
+      const bucket=getBucketForItem(item);
+      const spreadId=`spread-${itemIdx}`;
+      const plCls=agg.totalPLOpen>=0?'cg':'cr';
+      const plPctCls=agg.plPct>=0?'cg':'cr';
+      const popCls=agg.avgPoP>=65?'cg':agg.avgPoP>=50?'ca':'cr';
+      const paeCls=agg.pae>=0?'cg':'cr';
+      const paePctCls=agg.paePct>=100?'cg':agg.paePct>=1?'ca':'cr';
+      
+      // Build parent cells
+      const parentCells=cols.map(col=>{
+        const w=colWidths[col.key]||col.width;
+        const style=`width:${w}px;min-width:${w}px;max-width:${w}px`;
+        if(col.key==='_cb') return `<td class="cb-col" data-col="_cb" style="${style}"></td>`;
+        if(col.key==='_actions') return `<td data-col="_actions" style="${style}"></td>`;
+        if(col.key==='Symbol') return `<td data-col="Symbol" style="${style}">
+          <span class="spread-toggle" onclick="toggleSpread('${spreadId}')" style="cursor:pointer;margin-right:4px;font-size:11px;color:var(--tx3)">▶</span>
+          <strong style="font-size:11px">${item.underlying}</strong>
+          <span style="font-size:9px;color:var(--tx3);margin-left:4px">${item.legs.length} legs</span>
+        </td>`;
+        if(col.key==='_bucket') return `<td data-col="_bucket" style="${style}">${bucketTag(bucket)}</td>`;
+        if(col.key==='_type') return `<td data-col="_type" style="${style}">${strategyTag(item.type)}</td>`;
+        if(col.key==='Call/Put') return `<td style="${style}"><span style="font-size:11px;color:var(--tx3)">—</span></td>`;
+        if(col.key==='Strike Price') return `<td style="${style}"><span style="font-size:11px;color:var(--tx3)">—</span></td>`;
+        if(col.key==='Quantity') return `<td style="${style};text-align:right"><span class="mono">${item.legs.reduce((s,l)=>s+Math.abs(parseInt(l['Quantity']||0)),0)}</span></td>`;
+        if(col.key==='DTE') return `<td style="${style};text-align:right"><span class="mono${agg.minDTE<=7?' cr':agg.minDTE<=14?' ca':''}">${agg.minDTE<999?agg.minDTE+'d':'—'}</span></td>`;
+        if(col.key==='Cost') return `<td style="${style};text-align:right"><span class="mono ${agg.totalCost>=0?'cg':'cr'}">${agg.totalCost>=0?'$':'-$'}${Math.abs(agg.totalCost).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}</span></td>`;
+        if(col.key==='P/L Open') return `<td style="${style};text-align:right"><span class="mono ${plCls}">${agg.totalPLOpen>=0?'+$':'-$'}${Math.abs(agg.totalPLOpen).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}</span></td>`;
+        if(col.key==='P/L Opn%') return `<td style="${style};text-align:right"><span class="mono ${plPctCls}">${agg.plPct!==null?agg.plPct.toFixed(1)+'%':'—'}</span></td>`;
+        if(col.key==='PoP') return `<td style="${style};text-align:right"><span class="mono ${popCls}" style="font-weight:500">${agg.avgPoP!==null?agg.avgPoP+'%':'—'}</span></td>`;
+        if(col.key==='_pae') return `<td style="${style};text-align:right"><span class="mono ${paeCls}">${agg.pae!==null?(agg.pae>=0?'+$':'-$')+Math.abs(agg.pae).toFixed(2):'—'}</span></td>`;
+        if(col.key==='_pae_pct') return `<td style="${style};text-align:right"><span class="mono ${paePctCls}" style="font-weight:500">${agg.paePct!==null?agg.paePct.toFixed(1)+'%':'—'}</span></td>`;
+        return `<td style="${style}"></td>`;
+      }).join('');
+
+      rows.push(`<tr class="spread-parent" data-spread="${spreadId}" style="background:var(--surf2)">${parentCells}</tr>`);
+
+      // Leg rows (hidden by default)
+      item.legs.forEach((p, li) => {
+        const ri=list.indexOf(p);
+        const derived=deriveFields(p);
+        const legCells=cols.map(col=>{
+          const w=colWidths[col.key]||col.width;
+          const style=`width:${w}px;min-width:${w}px;max-width:${w}px`;
+          if(col.key==='_cb') return `<td class="cb-col" data-col="_cb" style="${style}"><input type="checkbox" class="row-cb" data-ri="${ri}" onchange="onRowCheck(this)"></td>`;
+          if(col.key==='_actions') return `<td data-col="_actions" style="${style};text-align:center"><button class="btn btn-sm" style="padding:2px 7px;font-size:11px" onclick="openEdit(${ri})">Edit</button></td>`;
+          if(col.key==='Symbol') return `<td data-col="Symbol" style="${style};padding-left:28px"><span style="font-size:11px;color:var(--tx3)">└</span> <span style="font-size:11px">${fmtSymbol(p['Symbol'])}</span></td>`;
+          if(col.key==='_bucket') return `<td style="${style}"></td>`;
+          if(col.key==='_type') return `<td style="${style}"></td>`;
+          const val=col.key==='_pae'?'__pae__':col.key==='_pae_pct'?'__pae_pct__':col.key==='_ann_yield'?'__ann_yield__':col.key==='_capital'?'__capital__':p[col.key];
+          const html=fmtCell(col,val,derived,p);
+          const align=['money','pl-money','pl-pct','pop','num1','num2','num3','pct','pct-chg','price2','price4','qty','dte','days'].includes(col.fmt)?'text-align:right':'';
+          return `<td data-col="${col.key}" style="${style};${align}">${html}</td>`;
+        }).join('');
+        rows.push(`<tr class="spread-leg" data-spread="${spreadId}" style="display:none;background:#FAFDF8">${legCells}</tr>`);
+      });
+    }
+  });
+
+  tbody.innerHTML=rows.join('');
+}
+
+function toggleSpread(spreadId){
+  const legs=document.querySelectorAll(`.spread-leg[data-spread="${spreadId}"]`);
+  const parent=document.querySelector(`.spread-parent[data-spread="${spreadId}"]`);
+  const toggle=parent?.querySelector('.spread-toggle');
+  const expanded=legs[0]?.style.display!=='none';
+  legs.forEach(l=>l.style.display=expanded?'none':'');
+  if(toggle) toggle.textContent=expanded?'▶':'▼';
+}
+
+function resetColOrder(){colOrder=ALL_COLS.map(c=>c.key);colWidths={};colHidden={};closeColPanel();renderPositions();saveToGH();}
+
+// ═══════════════════════════════════════════════════════════
+// SELECTION
+// ═══════════════════════════════════════════════════════════
+
+function onRowCheck(cb){
+  const ri=parseInt(cb.dataset.ri);
+  if(cb.checked)selectedIdx.add(ri);else selectedIdx.delete(ri);
+  cb.closest('tr').classList.toggle('selected',cb.checked);
+  updateBulkBar();
+}
+
+function toggleAll(masterCb){
+  const cbs=document.querySelectorAll('.row-cb');
+  cbs.forEach(cb=>{
+    cb.checked=masterCb.checked;
+    const ri=parseInt(cb.dataset.ri);
+    if(masterCb.checked)selectedIdx.add(ri);else selectedIdx.delete(ri);
+    cb.closest('tr').classList.toggle('selected',masterCb.checked);
+  });
+  updateBulkBar();
+}
+
+function clearSel(){
+  selectedIdx.clear();
+  document.querySelectorAll('.row-cb').forEach(cb=>{cb.checked=false;cb.closest('tr')?.classList.remove('selected');});
+  const mc=document.getElementById('select-all');
+  if(mc){mc.checked=false;mc.indeterminate=false;}
+  updateBulkBar();
+}
+
+function updateBulkBar(){
+  const bar=document.getElementById('bulk-bar');
+  document.getElementById('bulk-ct').textContent=selectedIdx.size;
+  bar.classList.toggle('show',selectedIdx.size>0);
+  const mc=document.getElementById('select-all');
+  const total=document.querySelectorAll('.row-cb').length;
+  if(mc){mc.checked=selectedIdx.size===total&&total>0;mc.indeterminate=selectedIdx.size>0&&selectedIdx.size<total;}
+}
+
+function deleteSelected(){
+  if(!selectedIdx.size)return;
+  if(!confirm(`Delete ${selectedIdx.size} position${selectedIdx.size!==1?'s':''}?`))return;
+  const list=getFilteredPositions();
+  const toRemove=new Set([...selectedIdx].map(ri=>list[ri]));
+  positions=positions.filter(p=>!toRemove.has(p));
+  selectedIdx.clear();
+  saveToGH();renderAll();
+}
+
+// ═══════════════════════════════════════════════════════════
+// EDIT POSITION
+// ═══════════════════════════════════════════════════════════
+let editingFilteredIdx=null;
+
+function openEdit(ri){
+  const list=getFilteredPositions();
+  const p=list[ri];
+  if(!p)return;
+  editingFilteredIdx=ri;
+  document.getElementById('e-idx').value=ri;
+  document.getElementById('e-sym').value=p['Symbol']||'';
+  document.getElementById('e-qty').value=p['Quantity']||'';
+  document.getElementById('e-strike').value=p['Strike Price']||'';
+  document.getElementById('e-cp').value=p['Call/Put']||'Put';
+  document.getElementById('e-exp').value=p['Exp Date']||'';
+  document.getElementById('e-dte').value=p['DTE']||'';
+  document.getElementById('e-trdprc').value=p['Trade Price']||'';
+  document.getElementById('e-mark').value=p['Mark']||'';
+  document.getElementById('e-plopen').value=p['P/L Open']||'';
+  document.getElementById('e-plpct').value=p['P/L Opn%']||'';
+  document.getElementById('e-pop').value=p['PoP']||'';
+  document.getElementById('e-ivr').value=p['IV Rank']||'';
+  openM('edit-mo');
+}
+
+function saveEdit(){
+  const ri=parseInt(document.getElementById('e-idx').value);
+  const list=getFilteredPositions();
+  const p=list[ri];
+  if(!p)return;
+  p['Symbol']=document.getElementById('e-sym').value;
+  p['Quantity']=document.getElementById('e-qty').value;
+  p['Strike Price']=document.getElementById('e-strike').value;
+  p['Call/Put']=document.getElementById('e-cp').value;
+  p['Exp Date']=document.getElementById('e-exp').value;
+  p['DTE']=document.getElementById('e-dte').value;
+  p['Trade Price']=document.getElementById('e-trdprc').value;
+  p['Mark']=document.getElementById('e-mark').value;
+  p['P/L Open']=document.getElementById('e-plopen').value;
+  p['P/L Opn%']=document.getElementById('e-plpct').value;
+  p['PoP']=document.getElementById('e-pop').value;
+  p['IV Rank']=document.getElementById('e-ivr').value;
+  saveToGH();closeM('edit-mo');renderAll();
+}
+
+function deleteFromEdit(){
+  const ri=parseInt(document.getElementById('e-idx').value);
+  if(!confirm('Delete this position?'))return;
+  const list=getFilteredPositions();
+  const p=list[ri];
+  positions=positions.filter(x=>x!==p);
+  saveToGH();closeM('edit-mo');renderAll();
+}
+
+// ═══════════════════════════════════════════════════════════
+// WORKFLOW BUCKETS
+// ═══════════════════════════════════════════════════════════
+const COND_FIELDS=[
+  {value:'pl_pct',      label:'P/L Open %',       type:'number', ops:['>=','<=','>','<','=']},
+  {value:'pl_dollar',   label:'P/L Open $',        type:'number', ops:['>=','<=','>','<','=']},
+  {value:'dte',         label:'DTE',                type:'number', ops:['>=','<=','>','<','=']},
+  {value:'days_opn',    label:'Days in Trade',      type:'number', ops:['>=','<=','>','<','=']},
+  {value:'pop',         label:'PoP %',              type:'number', ops:['>=','<=','>','<','=']},
+  {value:'itm_otm',     label:'ITM/OTM Status',     type:'select', ops:['=','!='], choices:['OTM','ITM','ATM','ATM+ITM']},
+  {value:'strike_dist', label:'Strike Distance %',  type:'number', ops:['>=','<=','>','<','=']},
+  {value:'iv_rank',     label:'IV Rank',             type:'number', ops:['>=','<=','>','<','=']},
+  {value:'ann_yield',   label:'Ann. Yield %',        type:'number', ops:['>=','<=','>','<','=']},
+  {value:'cost',        label:'Premium (Cost $)',    type:'number', ops:['>=','<=','>','<','=']},
+  {value:'cp',          label:'Call/Put',             type:'select', ops:['=','!='], choices:['Put','Call']},
+  {value:'type',        label:'Instrument Type',     type:'select', ops:['=','!='], choices:['OPTION','FUTURES_OPTION']},
+  {value:'early_profit',label:'Early Profit Rule',   type:'select', ops:['='], choices:['true']},
+  {value:'pae',         label:'PAE $ (Profit at Expiration)', type:'number', ops:['>=','<=','>','<','=']},
+  {value:'pae_pct',     label:'PAE % (of premium)',           type:'number', ops:['>=','<=','>','<','=']},
+];
+
+
+
+// ═══════════════════════════════════════════════════════════
+// STRATEGY CLASSIFICATION & SPREAD GROUPING
+// ═══════════════════════════════════════════════════════════
+const STRATEGY_STYLES = {
+  'Naked Put':           {color:'#185FA5', bg:'#EAF1FB'},
+  'Naked Call':          {color:'#534AB7', bg:'#EEEDFE'},
+  'Covered Call':        {color:'#0F9B8E', bg:'#E0F5F3'},
+  'Strangle':            {color:'#7B3FA0', bg:'#F3E8FF'},
+  'Jade Lizard':         {color:'#C26D1A', bg:'#FEF0DC'},
+  'Vertical Put Spread': {color:'#1A6B8A', bg:'#E0F2F9'},
+  'Vertical Call Spread':{color:'#2D6B3F', bg:'#E4F5EB'},
+  'Put Calendar':        {color:'#8A5A1A', bg:'#FDF2E0'},
+  'Call Calendar':       {color:'#1A4D8A', bg:'#E0EAF9'},
+  'PMCC':                {color:'#6B1A6B', bg:'#F9E8F9'},
+  'Long Put':            {color:'#888780', bg:'#F0EFE9'},
+  'Long Call':           {color:'#888780', bg:'#F0EFE9'},
+  'Complex':             {color:'#888780', bg:'#F0EFE9'},
+  'Unknown':             {color:'#888780', bg:'#F0EFE9'},
+};
+
+function getUnderlying(sym) {
+  if(!sym) return '';
+  if(sym.startsWith('./')) return sym.split(' ')[0]; // futures: ./ESH6
+  const m = sym.match(/^([A-Z]+)\s/);
+  return m ? m[1] : sym.trim();
+}
+
+function classifyLegs(legs) {
+  if(!legs || !legs.length) return 'Unknown';
+  if(legs.length === 1) {
+    const l = legs[0];
+    const qty = parseInt(l['Quantity'] || '0');
+    const cp = l['Call/Put'] || '';
+    if(qty < 0 && cp === 'Put')  return 'Naked Put';
+    if(qty < 0 && cp === 'Call') return 'Naked Call';
+    if(qty > 0 && cp === 'Call') return 'Long Call';
+    if(qty > 0 && cp === 'Put')  return 'Long Put';
+    return 'Unknown';
+  }
+  const shortPuts  = legs.filter(l => parseInt(l['Quantity']) < 0 && l['Call/Put'] === 'Put');
+  const longPuts   = legs.filter(l => parseInt(l['Quantity']) > 0 && l['Call/Put'] === 'Put');
+  const shortCalls = legs.filter(l => parseInt(l['Quantity']) < 0 && l['Call/Put'] === 'Call');
+  const longCalls  = legs.filter(l => parseInt(l['Quantity']) > 0 && l['Call/Put'] === 'Call');
+  const exps = [...new Set(legs.map(l => l['Exp Date']))];
+  const sameExp = exps.length === 1;
+
+  // Vertical Put Spread: 1 short put + 1 long put, same exp, long < short strike
+  if(shortPuts.length===1 && longPuts.length===1 && shortCalls.length===0 && longCalls.length===0 && sameExp) {
+    const sp = parseFloat(shortPuts[0]['Strike Price']);
+    const lp = parseFloat(longPuts[0]['Strike Price']);
+    if(lp < sp) return 'Vertical Put Spread';
+  }
+  // Vertical Call Spread: 1 short call + 1 long call, same exp, short < long strike
+  if(shortCalls.length===1 && longCalls.length===1 && shortPuts.length===0 && longPuts.length===0 && sameExp) {
+    const sc = parseFloat(shortCalls[0]['Strike Price']);
+    const lc = parseFloat(longCalls[0]['Strike Price']);
+    if(sc < lc) return 'Vertical Call Spread';
+  }
+  // Strangle: 1 short put + 1 short call, same exp, no longs
+  if(shortPuts.length===1 && shortCalls.length===1 && longPuts.length===0 && longCalls.length===0 && sameExp)
+    return 'Strangle';
+  // Jade Lizard: 1 short put + 1 short call + 1 long call, same exp
+  if(shortPuts.length===1 && shortCalls.length===1 && longCalls.length===1 && longPuts.length===0 && sameExp) {
+    const sc = parseFloat(shortCalls[0]['Strike Price']);
+    const lc = parseFloat(longCalls[0]['Strike Price']);
+    if(sc < lc) return 'Jade Lizard';
+  }
+  // Calendars and PMCC (different expirations)
+  if(!sameExp) {
+    const allPuts  = shortPuts.concat(longPuts);
+    const allCalls = shortCalls.concat(longCalls);
+    if(allPuts.length === 2 && allCalls.length === 0) return 'Put Calendar';
+    // PMCC: 1 long call (DTE > 180) + 1 short call
+    if(longCalls.length === 1 && shortCalls.length === 1 && shortPuts.length === 0 && longPuts.length === 0) {
+      const longDTE = parseDays(longCalls[0]['DTE']) || 0;
+      return longDTE > 180 ? 'PMCC' : 'Call Calendar';
+    }
+    if(allCalls.length === 2 && allPuts.length === 0) return 'Call Calendar';
+  }
+  return 'Complex';
+}
+
+// Build spread groups: group positions by underlying, then find multi-leg strategies
+// Returns array of "display items" — each is either a single position or a spread group
+function buildDisplayItems(positionList) {
+  // Group by underlying
+  const byUnderlying = {};
+  positionList.forEach(p => {
+    const und = getUnderlying(p['Symbol']);
+    if(!byUnderlying[und]) byUnderlying[und] = [];
+    byUnderlying[und].push(p);
+  });
+
+  const used = new Set();
+  const items = [];
+
+  // For each underlying, try to form multi-leg groups by same expiration first
+  Object.entries(byUnderlying).forEach(([und, legs]) => {
+    if(legs.length === 1) return; // handled below
+
+    // Group by expiration
+    const byExp = {};
+    legs.forEach(l => {
+      const exp = l['Exp Date'] || 'none';
+      if(!byExp[exp]) byExp[exp] = [];
+      byExp[exp].push(l);
+    });
+
+    // Check same-exp groups
+    Object.values(byExp).forEach(expLegs => {
+      if(expLegs.length > 1) {
+        const type = classifyLegs(expLegs);
+        if(type !== 'Unknown' && type !== 'Naked Put' && type !== 'Naked Call' && type !== 'Long Put' && type !== 'Long Call') {
+          items.push({ isSpread: true, legs: expLegs, type, underlying: und });
+          expLegs.forEach(l => used.add(l));
+        }
+      }
+    });
+
+    // Check cross-exp (PMCC/Calendar) for unused legs
+    const unusedLegs = legs.filter(l => !used.has(l));
+    if(unusedLegs.length > 1) {
+      const type = classifyLegs(unusedLegs);
+      if(type === 'PMCC' || type === 'Put Calendar' || type === 'Call Calendar') {
+        items.push({ isSpread: true, legs: unusedLegs, type, underlying: und });
+        unusedLegs.forEach(l => used.add(l));
+      }
+    }
+  });
+
+  // All remaining single positions
+  positionList.forEach(p => {
+    if(!used.has(p)) {
+      const type = classifyLegs([p]);
+      items.push({ isSpread: false, legs: [p], type, underlying: getUnderlying(p['Symbol']), position: p });
+    }
+  });
+
+  return items;
+}
+
+// Aggregate spread financials for display
+function spreadAggregate(legs) {
+  const totalCost = legs.reduce((s, l) => s + (cleanNum(l['Cost']) || 0), 0);
+  const totalPLOpen = legs.reduce((s, l) => s + (cleanNum(l['P/L Open']) || 0), 0);
+  const plPct = totalCost !== 0 ? Math.round((totalPLOpen / Math.abs(totalCost)) * 1000) / 10 : null;
+  const minDTE = Math.min(...legs.map(l => parseDays(l['DTE']) || 999).filter(n => n < 999));
+  const avgPoP = (() => { const ps = legs.filter(l => cleanNum(l['PoP']) != null); return ps.length ? Math.round(ps.reduce((s,l) => s+(cleanNum(l['PoP'])||0),0)/ps.length) : null; })();
+  const totalMark = legs.reduce((s, l) => s + (cleanNum(l['Mark'])||0)*(Math.abs(cleanNum(l['Quantity'])||0))*100, 0);
+
+  // PAE for spread: sum of ALL leg PAEs (short AND long)
+  // Long leg PAE = intrinsic at expiry - debit paid (correctly offsets the spread)
+  let pae = null;
+  legs.forEach(l => {
+    const d = deriveFields(l);
+    if(d.pae !== null) {
+      pae = (pae === null ? 0 : pae) + d.pae;
+    }
+  });
+  // PAE% uses net cost (totalCost = net credit for credit spreads, net debit for debit spreads)
+  // Use absolute net cost so the percentage makes sense in both directions
+  const paePct = (pae !== null && totalCost !== 0) ? Math.round((pae / Math.abs(totalCost)) * 1000) / 10 : null;
+
+  return { totalCost, totalPLOpen, plPct, minDTE, avgPoP, pae, paePct, totalMark };
+}
+
+// For bucket matching on a spread: evaluate bucket against spread aggregate
+function spreadMatchesBucket(legs, bucket) {
+  if(!bucket.conditions || !bucket.conditions.length) return false;
+  const agg = spreadAggregate(legs);
+  return bucket.conditions.every(cond => {
+    const {field, op, value} = cond;
+    let actual = null;
+    switch(field) {
+      case 'pl_pct':    actual = agg.plPct; break;
+      case 'pl_dollar': actual = agg.totalPLOpen; break;
+      case 'dte':       actual = agg.minDTE < 999 ? agg.minDTE : null; break;
+      case 'pop':       actual = agg.avgPoP; break;
+      case 'pae':       actual = agg.pae; break;
+      case 'pae_pct':   actual = agg.paePct; break;
+      // For per-leg fields, use first short leg
+      default: {
+        const shortLeg = legs.find(l => parseInt(l['Quantity']) < 0) || legs[0];
+        return shortLeg ? evalCondition(shortLeg, cond) : false;
+      }
+    }
+    if(actual === null) return false;
+    const numVal = parseFloat(value);
+    const isNum = !isNaN(numVal);
+    switch(op) {
+      case '>=': return isNum ? actual >= numVal : actual >= value;
+      case '<=': return isNum ? actual <= numVal : actual <= value;
+      case '>':  return isNum ? actual > numVal  : actual > value;
+      case '<':  return isNum ? actual < numVal  : actual < value;
+      case '=':  return String(actual) === String(value);
+      case '!=': return String(actual) !== String(value);
+      default:   return false;
+    }
+  });
+}
+
+function getBucketForItem(item) {
+  if(!item.isSpread) return getBucketForPosition(item.position);
+  for(const b of buckets) {
+    if(spreadMatchesBucket(item.legs, b)) return b;
+  }
+  return null;
+}
+
+function strategyTag(type) {
+  const s = STRATEGY_STYLES[type] || STRATEGY_STYLES['Unknown'];
+  return `<span style="font-size:9.5px;padding:2px 6px;border-radius:6px;font-weight:500;white-space:nowrap;background:${s.bg};color:${s.color};border:1px solid ${s.color}22">${type}</span>`;
+}
+
+function bucketTag(bucket) {
+  if(!bucket) return '<span style="color:var(--tx3)">—</span>';
+  return `<span style="font-size:10px;padding:2px 7px;border-radius:8px;font-weight:500;white-space:nowrap;background:${hexToRgba(bucket.color,0.13)};color:${bucket.color};border:1px solid ${hexToRgba(bucket.color,0.28)}">${bucket.name}</span>`;
+}
+
+function fmtSymbol(sym) {
+  if(!sym) return '';
+  // Equity: "AAPL  260417P00245000" → "AAPL"
+  // Futures: "./ESH6 E3CH6 260318C6770" → "ES" (strip ./ and contract suffix)
+  if(sym.startsWith('./')) {
+    const root = sym.split(' ')[0].replace('./',''); // e.g. ESH6
+    return root.replace(/[A-Z]\d$/, ''); // strip month+year suffix: ESH6 → ES
+  }
+  const m = sym.match(/^([A-Z/]+)\s/);
+  return m ? m[1] : sym.trim();
+}
+
+// Returns the first bucket that matches a position (respects order)
+
+function hexToRgba(hex, alpha){
+  const r=parseInt(hex.slice(1,3),16);
+  const g=parseInt(hex.slice(3,5),16);
+  const b=parseInt(hex.slice(5,7),16);
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+
+function getBucketForPosition(p){
+  for(const b of buckets){
+    if(matchesBucket(p,b)) return b;
+  }
+  return null;
+}
+
+function evalCondition(p,cond){
+  const derived=deriveFields(p);
+  const {field,op,value}=cond;
+  let actual=null;
+
+  switch(field){
+    case 'pl_pct':    actual=cleanNum(p['P/L Opn%']); break;
+    case 'pl_dollar': actual=cleanNum(p['P/L Open']); break;
+    case 'dte':       actual=parseDays(p['DTE']); break;
+    case 'days_opn':  actual=parseDays(p["D's Opn"]); break;
+    case 'pop':       actual=cleanNum(p['PoP']); break;
+    case 'strike_dist': actual=derived.strikeDist!=null?Math.abs(derived.strikeDist):null; break;
+    case 'iv_rank':   actual=cleanNum(p['IV Rank']); break;
+    case 'cost':      actual=cleanNum(p['Cost']); break;
+    case 'cp':        actual=p['Call/Put']||''; break;
+    case 'type':      actual=p['Type']||''; break;
+    case 'early_profit': actual=derived.earlyProfit?'true':'false'; break;
+    case 'pae':     actual=derived.pae; break;
+    case 'pae_pct': actual=derived.paePct; break;
+    case 'itm_otm':{
+      const itmOtm=derived.itmOtm;
+      if(value==='ATM+ITM') actual=(itmOtm==='ATM'||itmOtm==='ITM')?value:itmOtm;
+      else actual=itmOtm;
+      break;
+    }
+    case 'ann_yield':{
+      const pl=cleanNum(p['P/L Open']);
+      const cost=cleanNum(p['Cost']);
+      const dte=parseDays(p['DTE']);
+      const daysOpn=parseDays(p["D's Opn"]);
+      if(cost!=null&&cost>0&&dte!=null&&daysOpn!=null){
+        actual=(cost/(dte+daysOpn)*365/cost*100);
+      }
+      break;
+    }
+  }
+
+  if(actual===null||actual===undefined) return false;
+
+  const numVal=parseFloat(value);
+  const isNum=!isNaN(numVal);
+
+  switch(op){
+    case '>=': return isNum?actual>=numVal:actual>=value;
+    case '<=': return isNum?actual<=numVal:actual<=value;
+    case '>':  return isNum?actual>numVal:actual>value;
+    case '<':  return isNum?actual<numVal:actual<value;
+    case '=':  return String(actual)===String(value);
+    case '!=': return String(actual)!==String(value);
+    default:   return false;
+  }
+}
+
+function matchesBucket(p,bucket){
+  if(!bucket.conditions||!bucket.conditions.length) return false;
+  return bucket.conditions.every(c=>evalCondition(p,c));
+}
+
+function renderWorkflow(){
+  const wfEmpty=document.getElementById('wf-empty');
+  const wfList=document.getElementById('wf-buckets-list');
+  const wfUncat=document.getElementById('wf-uncategorized');
+
+  if(!positions.length){
+    wfList.innerHTML='';wfUncat.innerHTML='';
+    wfEmpty.style.display='block';
+    renderWFStats([]);
+    return;
+  }
+  wfEmpty.style.display='none';
+
+  const allItems=buildDisplayItems(positions);
+  const matchedItems=new Set();
+  const bucketItems={};
+  buckets.forEach(b=>{
+    bucketItems[b.id]=[];
+    allItems.forEach(item=>{
+      if(!matchedItems.has(item)){
+        const matches=item.isSpread?spreadMatchesBucket(item.legs,b):matchesBucket(item.position,b);
+        if(matches){ bucketItems[b.id].push(item); matchedItems.add(item); }
+      }
+    });
+  });
+  const uncatItems=allItems.filter(item=>!matchedItems.has(item));
+  // For backwards compat with renderWFStats: also build flat position lists
+  const bucketPositions={};
+  buckets.forEach(b=>{ bucketPositions[b.id]=(bucketItems[b.id]||[]).flatMap(item=>item.legs); });
+  const uncategorized=uncatItems.flatMap(item=>item.legs);
+
+  renderWFStats(positions);
+  // Ensure all WF_COLS keys are in wfColOrder (adds newly introduced columns)
+  if(!wfColOrder.length) wfColOrder=WF_COLS.map(c=>c.key);
+  else { WF_COLS.forEach(c=>{ if(!wfColOrder.includes(c.key)) wfColOrder.push(c.key); }); }
+
+  wfList.innerHTML=buckets.map(b=>{
+    const list=bucketPositions[b.id]||[];
+    const bktLegs=(bucketItems[b.id]||[]).flatMap(i=>i.legs);
+    const totalPL=bktLegs.reduce((s,p)=>s+(cleanNum(p['P/L Open'])||0),0);
+    const avgDTE=bktLegs.length?Math.round(bktLegs.reduce((s,p)=>s+(parseDays(p['DTE'])||0),0)/bktLegs.length):0;
+    const popsArr=bktLegs.filter(p=>cleanNum(p['PoP'])!=null);
+    const pop=popsArr.length?Math.round(popsArr.reduce((s,p)=>s+(cleanNum(p['PoP'])||0),0)/popsArr.length):null;
+    const condSummary=b.conditions.map(c=>{const f=COND_FIELDS.find(x=>x.value===c.field);return `${f?f.label:c.field} ${c.op} ${c.value}`;}).join(' AND ');
+    const bIdx=buckets.findIndex(x=>x.id===b.id);
+    return `<div class="wf-bucket" draggable="true" data-bucket-id="${b.id}"
+      ondragstart="bucketDragStart(event,this)" ondragover="bucketDragOver(event,this)"
+      ondragleave="bucketDragLeave(this)" ondrop="bucketDrop(event,this)" ondragend="bucketDragEnd(this)">
+      <div class="wf-bhdr" onclick="toggleWFBucket(this)">
+        <span class="wf-drag-handle" onclick="event.stopPropagation()">⠿</span>
+        <span class="wf-order-badge">${bIdx+1}</span>
+        <div class="wf-bdot" style="background:${b.color}"></div>
+        <div class="wf-bname">${b.name}</div>
+        <div style="font-size:10px;color:var(--tx3);flex:1;margin-left:6px;font-style:italic;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${condSummary}</div>
+        <div class="wf-bcnt">${(bucketItems[b.id]||[]).length}</div>
+        <div class="wf-bbtns" onclick="event.stopPropagation()">
+          <button class="btn btn-sm" style="padding:2px 7px;font-size:10px" onclick="openBucketBuilder('${b.id}')">Edit</button>
+        </div>
+      </div>
+      ${list.length?`<div class="wf-bmeta">
+        <div class="wf-bmi"><div class="wf-bml">Positions</div><div class="wf-bmv">${(bucketItems[b.id]||[]).length}</div></div>
+        <div class="wf-bmi"><div class="wf-bml">P/L Open</div><div class="wf-bmv ${totalPL>=0?'cg':'cr'}">${totalPL>=0?'+$':'-$'}${Math.abs(totalPL).toFixed(0)}</div></div>
+        <div class="wf-bmi"><div class="wf-bml">Avg DTE</div><div class="wf-bmv">${avgDTE}d</div></div>
+        ${pop!==null?`<div class="wf-bmi"><div class="wf-bml">Avg PoP</div><div class="wf-bmv ${pop>=65?'cg':pop>=50?'ca':'cr'}">${pop}%</div></div>`:''}
+      </div>`:''}
+      <div class="wf-bbody ${list.length?'open':''}">
+        ${(bucketItems[b.id]||[]).length?renderWFTable(bucketItems[b.id],b.id,b):'<div style="padding:10px 13px;font-size:12px;color:var(--tx3)">No positions match.</div>'}
+      </div>
+    </div>`;
+  }).join('');
+
+  if(uncatItems.length){
+    wfUncat.innerHTML=`<div class="wf-bucket">
+      <div class="wf-bhdr" onclick="toggleWFBucket(this)">
+        <div class="wf-bdot" style="background:#888780"></div>
+        <div class="wf-bname">Uncategorized</div>
+        <div class="wf-bcnt">${uncatItems.length}</div>
+      </div>
+      <div class="wf-bbody open">${renderWFTable(uncatItems,'uncat',null)}</div>
+    </div>`;
+  } else { wfUncat.innerHTML=''; }
+}
+
+
+function renderWFStats(list){
+  const open=list.filter(p=>cleanNum(p['Quantity'])<0);
+  const totalPL=open.reduce((s,p)=>s+(cleanNum(p['P/L Open'])||0),0);
+  const itm=open.filter(p=>deriveFields(p).itmOtm==='ITM').length;
+  const avgPop=open.filter(p=>cleanNum(p['PoP'])!=null).length
+    ?Math.round(open.filter(p=>cleanNum(p['PoP'])!=null).reduce((s,p)=>s+(cleanNum(p['PoP'])||0),0)/open.filter(p=>cleanNum(p['PoP'])!=null).length):null;
+
+  // Per-bucket counts — use SAME item-based logic as renderWorkflow
+  // buildDisplayItems groups spread legs into single items so counts match
+  const statsItems=buildDisplayItems(list);
+  const statsMatched=new Set();
+  const bucketCounts={};
+  buckets.forEach(b=>{
+    bucketCounts[b.id]=0;
+    statsItems.forEach(item=>{
+      if(!statsMatched.has(item)){
+        const hits=item.isSpread?spreadMatchesBucket(item.legs,b):matchesBucket(item.position,b);
+        if(hits){ bucketCounts[b.id]++; statsMatched.add(item); }
+      }
+    });
+  });
+  const uncatCount=statsItems.filter(item=>!statsMatched.has(item)).length;
+
+  const bucketWidgets=buckets.map(b=>`
+    <div class="stat" style="cursor:pointer" onclick="document.querySelector('[data-bucket-id=\'${b.id}\']')?.scrollIntoView({behavior:'smooth',block:'nearest'})">
+      <div class="sl" style="display:flex;align-items:center;gap:4px">
+        <span style="width:7px;height:7px;border-radius:50%;background:${b.color};display:inline-block"></span>
+        ${b.name}
+      </div>
+      <div class="sv" style="font-size:18px">${bucketCounts[b.id]}</div>
+    </div>`).join('');
+
+  document.getElementById('wf-stats').innerHTML=`
+    <div class="stat"><div class="sl">Total</div><div class="sv">${statsItems.length}</div><div class="ss">${open.length} short</div></div>
+    <div class="stat"><div class="sl">P/L Open</div><div class="sv ${totalPL>=0?'cg':'cr'}" style="font-size:16px">${fmt$(totalPL,true)}</div></div>
+    <div class="stat"><div class="sl">Avg PoP</div><div class="sv ${avgPop>=65?'cg':avgPop>=50?'ca':'cr'}">${avgPop!==null?avgPop+'%':'—'}</div></div>
+    <div class="stat"><div class="sl">ITM</div><div class="sv ${itm>0?'cr':'cg'}">${itm}</div></div>
+    ${bucketWidgets}
+    ${uncatCount>0?`<div class="stat"><div class="sl" style="display:flex;align-items:center;gap:4px"><span style="width:7px;height:7px;border-radius:50%;background:#888780;display:inline-block"></span>Uncategorized</div><div class="sv" style="font-size:18px">${uncatCount}</div></div>`:''}
+  `;
+}
+
+// ═══════════════════════════════════════════════════════════
+// WORKFLOW TABLE COLUMNS
+// ═══════════════════════════════════════════════════════════
+const WF_COLS = [
+  {key:'Symbol',            label:'Symbol',     width:130, sortable:true,  fmt:'wf-symbol'},
+  {key:'_bucket',           label:'Bucket',     width:110, sortable:true,  fmt:'wf-bucket'},
+  {key:'_type',             label:'Type',       width:145, sortable:true,  fmt:'strategy-tag'},
+  {key:'Call/Put',          label:'C/P',        width:40,  sortable:true,  fmt:'wf-cp'},
+  {key:'Strike Price',      label:'Strike',     width:72,  sortable:true,  fmt:'price4'},
+  {key:'Quantity',          label:'Qty',        width:40,  sortable:true,  fmt:'qty'},
+  {key:'Exp Date',          label:'Exp',        width:90,  sortable:true,  fmt:'text'},
+  {key:'DTE',               label:'DTE',        width:44,  sortable:true,  fmt:'dte'},
+  {key:"D's Opn",           label:"D's Opn",    width:52,  sortable:true,  fmt:'days'},
+  {key:'Trade Price',       label:'Trd Prc',    width:65,  sortable:true,  fmt:'price4'},
+  {key:'Mark',              label:'Mark',       width:65,  sortable:true,  fmt:'price4'},
+  {key:'P/L Open',          label:'P/L $',      width:72,  sortable:true,  fmt:'pl-money'},
+  {key:'P/L Opn%',          label:'P/L %',      width:60,  sortable:true,  fmt:'pl-pct'},
+  {key:'_pae',              label:'PAE $',      width:75,  sortable:true,  fmt:'pae-money'},
+  {key:'_pae_pct',          label:'PAE %',      width:58,  sortable:true,  fmt:'pae-pct'},
+  {key:'P/L Day',           label:'P/L Day',    width:65,  sortable:true,  fmt:'pl-money'},
+  {key:'PoP',               label:'PoP',        width:50,  sortable:true,  fmt:'pop'},
+  {key:'IV Rank',           label:'IVR',        width:44,  sortable:true,  fmt:'num1'},
+  {key:'Underlying Last Price', label:'Last',   width:75,  sortable:true,  fmt:'price2'},
+  {key:'β Delta',           label:'β Δ',        width:55,  sortable:true,  fmt:'num2'},
+  {key:'/ Delta',           label:'Δ',          width:50,  sortable:true,  fmt:'num2'},
+  {key:'Theta',             label:'θ',          width:50,  sortable:true,  fmt:'num2'},
+  {key:'Cost',              label:'Cost',       width:72,  sortable:true,  fmt:'money'},
+  {key:'Sector',            label:'Sector',     width:100, sortable:true,  fmt:'text'},
+];
+
+function wfSortVal(p, colKey){
+  if(colKey==='_pae'||colKey==='_pae_pct'||colKey==='_ann_yield'||colKey==='_capital'||colKey==='_type'){
+    const d=deriveFields(p);
+    if(colKey==='_pae') return d.pae;
+    if(colKey==='_pae_pct') return d.paePct;
+    if(colKey==='_ann_yield') return d._annYield;
+    if(colKey==='_capital') return d._capital;
+    if(colKey==='_type') return d._stratType||'';
+  }
+  if(colKey==='_bucket'){
+    const b=getBucketForPosition(p);
+    if(!b) return 'zzz';
+    return String(buckets.findIndex(x=>x.id===b.id)).padStart(3,'0');
+  }
+  const col=WF_COLS.find(c=>c.key===colKey);
+  if(!col) return null;
+  const val=p[colKey];
+  if(col.fmt==='dte'||col.fmt==='days') return parseDays(val);
+  if(['money','pl-money','pl-pct','pop','num1','num2','price2','price4','qty'].includes(col.fmt)) return cleanNum(val);
+  return String(val||'').toLowerCase();
+}
+
+function renderWFTable(itemsOrLegs, bucketId, currentBucket){
+  if(!wfColOrder.length) wfColOrder=WF_COLS.map(c=>c.key);
+  else { WF_COLS.forEach(c=>{ if(!wfColOrder.includes(c.key)) wfColOrder.push(c.key); }); }
+
+  // Accept either items array or flat positions — normalize to items
+  const items = (itemsOrLegs.length && itemsOrLegs[0].isSpread !== undefined)
+    ? itemsOrLegs
+    : buildDisplayItems(itemsOrLegs);
+
+  const ss=wfSortState[bucketId]||{col:'',asc:true};
+  // Sort by first leg's sort value for now
+  const sortedItems=ss.col?[...items].sort((a,b)=>{
+    const pa=a.isSpread?a.legs[0]:a.position;
+    const pb=b.isSpread?b.legs[0]:b.position;
+    const av=wfSortVal(pa,ss.col), bv=wfSortVal(pb,ss.col);
+    if(av===null) return 1; if(bv===null) return -1;
+    return (av<bv?-1:av>bv?1:0)*(ss.asc?1:-1);
+  }):[...items];
+
+  const cols=wfColOrder.map(k=>WF_COLS.find(c=>c.key===k)).filter(c=>c&&!wfColHidden[c.key]);
+
+  const thead=cols.map(col=>{
+    const w=wfColWidths[col.key]||col.width;
+    const arrow=col.sortable&&ss.col===col.key?(ss.asc?'▲':'▼'):'';
+    const activeClass=ss.col===col.key?'style="color:var(--blue)"':'';
+    return `<th data-wfcol="${col.key}" data-bid="${bucketId}"
+      style="width:${w}px;min-width:${w}px;max-width:${w}px;position:relative;text-align:left;font-size:10px;font-weight:500;color:var(--tx3);padding:5px 8px;border-bottom:1px solid var(--bdr);border-right:1px solid var(--bdr);white-space:nowrap;cursor:pointer;user-select:none;text-transform:uppercase;letter-spacing:.3px;background:var(--surf2)"
+      onclick="wfSort('${bucketId}','${col.key}')"
+      draggable="true"
+      ondragstart="wfColDragStart(event,'${col.key}')"
+      ondragover="event.preventDefault();this.style.background='var(--bbg)'"
+      ondragleave="this.style.background='var(--surf2)'"
+      ondrop="wfColDrop(event,'${col.key}',this)">
+      <span ${activeClass}>${col.label} ${arrow}</span>
+      <div style="position:absolute;right:0;top:0;bottom:0;width:5px;cursor:col-resize;z-index:2"
+        onmousedown="wfResizeStart(event,'${col.key}',${w})"></div>
+    </th>`;
+  }).join('');
+
+  const TD = (style,align,html) =>
+    `<td style="${style};${align?'text-align:right':''};padding:6px 8px;border-bottom:1px solid var(--bdr);border-right:1px solid var(--bdr);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;vertical-align:middle;font-size:12px">${html}</td>`;
+
+  const ALIGNS = new Set(['money','pl-money','pl-pct','pop','num1','num2','price2','price4','qty','dte','days']);
+
+  const tbody = sortedItems.map((item, iidx) => {
+    if(item.isSpread) {
+      const agg = spreadAggregate(item.legs);
+      const sid = `wfs-${bucketId}-${iidx}`;
+      const plCls = agg.totalPLOpen>=0?'cg':'cr';
+      const paePctCls = agg.paePct>=100?'cg':agg.paePct>=1?'ca':'cr';
+
+      const parentCells = cols.map(col => {
+        const w = wfColWidths[col.key]||col.width;
+        const s = `width:${w}px;min-width:${w}px;max-width:${w}px`;
+        const align = ALIGNS.has(col.fmt);
+        if(col.key==='Symbol') return TD(s,false,
+          `<span class="wf-spread-toggle" onclick="toggleWFSpread('${sid}')" style="cursor:pointer;margin-right:4px;color:var(--tx3);font-size:10px;user-select:none">▶</span><strong style="font-size:11px">${item.underlying}</strong><span style="font-size:9px;color:var(--tx3);margin-left:4px">${item.legs.length} legs</span>`);
+        if(col.key==='_bucket') return TD(s,false, currentBucket?bucketTag(currentBucket):'<span style="color:var(--tx3)">—</span>');
+        if(col.key==='_type') return TD(s,false, strategyTag(item.type));
+        if(col.key==='Call/Put'||col.key==='Strike Price') return TD(s,true,'<span style="color:var(--tx3)">—</span>');
+        if(col.key==='Quantity') return TD(s,true,`<span class="mono">${item.legs.reduce((s,l)=>s+Math.abs(parseInt(l['Quantity']||0)),0)}</span>`);
+        if(col.key==='DTE') return TD(s,true,`<span class="mono${agg.minDTE<=7?' cr':agg.minDTE<=14?' ca':''}">${agg.minDTE<999?agg.minDTE+'d':'—'}</span>`);
+        if(col.key==='Cost') return TD(s,true,`<span class="mono ${agg.totalCost>=0?'cg':'cr'}">${agg.totalCost>=0?'$':'-$'}${Math.abs(agg.totalCost).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}</span>`);
+        if(col.key==='P/L Open') return TD(s,true,`<span class="mono ${plCls}">${agg.totalPLOpen>=0?'+$':'-$'}${Math.abs(agg.totalPLOpen).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}</span>`);
+        if(col.key==='P/L Opn%') return TD(s,true,`<span class="mono ${plCls}">${agg.plPct!==null?agg.plPct.toFixed(1)+'%':'—'}</span>`);
+        if(col.key==='PoP') return TD(s,true,`<span class="mono ${agg.avgPoP>=65?'cg':agg.avgPoP>=50?'ca':'cr'}" style="font-weight:500">${agg.avgPoP!==null?agg.avgPoP+'%':'—'}</span>`);
+        if(col.key==='_pae') return TD(s,true,`<span class="mono ${agg.pae>=0?'cg':'cr'}">${agg.pae!==null?(agg.pae>=0?'+$':'-$')+Math.abs(agg.pae).toFixed(2):'—'}</span>`);
+        if(col.key==='_pae_pct') return TD(s,true,`<span class="mono ${paePctCls}" style="font-weight:500">${agg.paePct!==null?agg.paePct.toFixed(1)+'%':'—'}</span>`);
+        return TD(s,align,'');
+      }).join('');
+
+      const legRows = item.legs.map(leg => {
+        const derived = deriveFields(leg);
+        const legCells = cols.map(col => {
+          const w = wfColWidths[col.key]||col.width;
+          const s = `width:${w}px;min-width:${w}px;max-width:${w}px`;
+          const align = ALIGNS.has(col.fmt);
+          if(col.key==='Symbol') return TD(s,false,
+            `<span style="color:var(--tx3);margin-right:3px;font-size:10px;padding-left:14px">└</span><span style="font-size:11px">${fmtSymbol(leg['Symbol'])}</span>`);
+          if(col.key==='_bucket'||col.key==='_type') return TD(s,false,'');
+          const val = col.key==='_pae'?'__pae__':col.key==='_pae_pct'?'__pae_pct__':col.key==='_ann_yield'?'__ann_yield__':col.key==='_capital'?'__capital__':leg[col.key];
+          return TD(s,align, fmtWFCell(col,val,derived,leg));
+        }).join('');
+        return `<tr class="wf-spread-leg" data-wsid="${sid}" style="display:none;background:#FAFDF8" onmouseover="this.style.background='#F3FBF5'" onmouseout="this.style.background='#FAFDF8'">${legCells}</tr>`;
+      }).join('');
+
+      return `<tr class="wf-spread-parent" data-wsid="${sid}" style="background:var(--surf2)" onmouseover="this.style.background='#EFEEE8'" onmouseout="this.style.background='var(--surf2)'">${parentCells}</tr>${legRows}`;
+    } else {
+      // Single position
+      const p = item.position;
+      const derived = deriveFields(p);
+      const cells = cols.map(col => {
+        const w = wfColWidths[col.key]||col.width;
+        const s = `width:${w}px;min-width:${w}px;max-width:${w}px`;
+        const align = ALIGNS.has(col.fmt);
+        // Bucket column: show currentBucket (where it actually sits), not re-evaluated
+        if(col.key==='_bucket') return TD(s,false, currentBucket?bucketTag(currentBucket):'<span style="color:var(--tx3)">—</span>');
+        if(col.key==='_type') return TD(s,false, strategyTag(item.type));
+        const val = col.key==='_pae'?'__pae__':col.key==='_pae_pct'?'__pae_pct__':col.key==='_ann_yield'?'__ann_yield__':col.key==='_capital'?'__capital__':p[col.key];
+        return TD(s,align, fmtWFCell(col,val,derived,p));
+      }).join('');
+      return `<tr style="cursor:default" onmouseover="this.style.background='#FAFAF7'" onmouseout="this.style.background=''">${cells}</tr>`;
+    }
+  }).join('');
+
+  return `<div style="overflow-x:auto">
+    <table style="border-collapse:collapse;width:max-content;min-width:100%;table-layout:fixed">
+      <thead><tr>${thead}</tr></thead>
+      <tbody>${tbody}</tbody>
+    </table>
+  </div>`;
+}
+
+function toggleWFSpread(sid){
+  const legs=document.querySelectorAll(`.wf-spread-leg[data-wsid="${sid}"]`);
+  const parent=document.querySelector(`.wf-spread-parent[data-wsid="${sid}"]`);
+  const toggle=parent?.querySelector('.wf-spread-toggle');
+  const expanded=legs[0]?.style.display!=='none';
+  legs.forEach(l=>l.style.display=expanded?'none':'');
+  if(toggle) toggle.textContent=expanded?'▶':'▼';
+}
+
+function fmtWFCell(col, val, derived, pos){
+  if(val===undefined||val===null||val==='--'||val===''){
+    return '<span style="color:var(--tx3)">—</span>';
+  }
+  if(col.key==='_bucket'||col.fmt==='wf-bucket'){
+    const bucket=pos?getBucketForPosition(pos):null;
+    if(!bucket) return '<span style="color:var(--tx3)">—</span>';
+    return `<span style="font-size:10px;padding:2px 7px;border-radius:8px;font-weight:500;white-space:nowrap;background:${hexToRgba(bucket.color,0.13)};color:${bucket.color};border:1px solid ${hexToRgba(bucket.color,0.28)}">${bucket.name}</span>`;
+  }
+  if(col.fmt==='wf-symbol'){
+    const isFut=String(val).startsWith('./');
+    const sym=val.split(' ')[0].replace('./','');
+    const futTag=isFut?'<span style="font-size:9px;background:var(--pbg);color:var(--pt);padding:1px 4px;border-radius:6px;margin-left:3px;font-weight:500">FUT</span>':'';
+    return `<strong style="font-size:11px">${sym}</strong>${futTag}`;
+  }
+  if(col.fmt==='wf-cp'){
+    return val==='Put'?'<span class="badge br">P</span>':'<span class="badge bg">C</span>';
+  }
+  // Handle _type sentinel  
+  if(val==='__type__'){
+    const t = derived?._stratType || 'Unknown';
+    return strategyTag(t);
+  }
+  // Reuse main fmtCell for all other formats
+  return fmtCell(col,val,derived,pos);
+}
+
+function wfSort(bucketId, colKey){
+  const ss=wfSortState[bucketId]||{col:'',asc:true};
+  wfSortState[bucketId]={col:colKey, asc:ss.col===colKey?!ss.asc:true};
+  renderWorkflow();
+}
+
+let wfDragColKey=null;
+function wfColDragStart(event, colKey){
+  wfDragColKey=colKey;
+  event.dataTransfer.effectAllowed='move';
+}
+function wfColDrop(event, toKey, th){
+  event.preventDefault();
+  th.style.background='var(--surf2)';
+  if(!wfDragColKey||wfDragColKey===toKey) return;
+  const fi=wfColOrder.indexOf(wfDragColKey);
+  const ti=wfColOrder.indexOf(toKey);
+  if(fi<0||ti<0) return;
+  wfColOrder.splice(fi,1);
+  wfColOrder.splice(ti,0,wfDragColKey);
+  wfDragColKey=null;
+  saveToGH();
+  renderWorkflow();
+}
+
+function wfResizeStart(event, colKey, startW){
+  event.stopPropagation();
+  event.preventDefault();
+  const startX=event.clientX;
+  const onMove=e=>{
+    const newW=Math.max(40, startW+e.clientX-startX);
+    wfColWidths[colKey]=newW;
+    // Update all matching th/td in all wf tables
+    document.querySelectorAll(`[data-wfcol="${colKey}"]`).forEach(el=>{
+      el.style.width=newW+'px';el.style.minWidth=newW+'px';el.style.maxWidth=newW+'px';
+    });
+  };
+  const onUp=()=>{
+    document.removeEventListener('mousemove',onMove);
+    document.removeEventListener('mouseup',onUp);
+    saveToGH();
+  };
+  document.addEventListener('mousemove',onMove);
+  document.addEventListener('mouseup',onUp);
+}
+
+
+function toggleWFBucket(hdr){
+  hdr.parentElement.querySelector('.wf-bbody').classList.toggle('open');
+}
+
+// ═══════════════════════════════════════════════════════════
+// BUCKET BUILDER
+// ═══════════════════════════════════════════════════════════
+let editingBucketId=null;
+
+function openBucketBuilder(id){
+  editingBucketId=id;
+  const isEdit=id!==null;
+  document.getElementById('bucket-mo-title').textContent=isEdit?'Edit bucket':'Create bucket';
+  document.getElementById('bkt-delete-btn').style.display=isEdit?'':'none';
+  document.getElementById('bkt-id').value=id||'';
+
+  const existing=isEdit?buckets.find(b=>b.id===id):null;
+  document.getElementById('bkt-name').value=existing?.name||'';
+
+  // Color swatches
+  const selectedColor=existing?.color||SWATCH_COLORS[0];
+  document.getElementById('color-swatches').innerHTML=SWATCH_COLORS.map(c=>
+    `<div class="color-swatch ${c===selectedColor?'selected':''}" style="background:${c}" data-color="${c}" onclick="selectSwatch(this)"></div>`
+  ).join('');
+
+  // Conditions
+  document.getElementById('cond-rows').innerHTML='';
+  if(existing?.conditions?.length){
+    existing.conditions.forEach(c=>addCondRow(c));
+  } else {
+    addCondRow();
+  }
+
+  openM('bucket-mo');
+}
+
+function selectSwatch(el){
+  document.querySelectorAll('.color-swatch').forEach(s=>s.classList.remove('selected'));
+  el.classList.add('selected');
+}
+
+function addCondRow(cond=null){
+  const container=document.getElementById('cond-rows');
+  const div=document.createElement('div');
+  div.className='cond-row';
+
+  const fieldSel=document.createElement('select');
+  COND_FIELDS.forEach(f=>{
+    const opt=document.createElement('option');
+    opt.value=f.value;opt.textContent=f.label;
+    if(cond&&cond.field===f.value)opt.selected=true;
+    fieldSel.appendChild(opt);
+  });
+
+  const opSel=document.createElement('select');
+  const valContainer=document.createElement('div');
+  valContainer.className='cond-val';
+  valContainer.style.cssText='flex:1;display:flex';
+
+  function updateOpAndVal(){
+    const f=COND_FIELDS.find(x=>x.value===fieldSel.value);
+    opSel.innerHTML=(f?.ops||['=']).map(o=>`<option ${cond&&o===cond.op?'selected':''}>${o}</option>`).join('');
+    valContainer.innerHTML='';
+    if(f?.type==='select'){
+      const sel=document.createElement('select');
+      sel.style.flex='1';
+      (f.choices||[]).forEach(ch=>{
+        const opt=document.createElement('option');
+        opt.value=ch;opt.textContent=ch;
+        if(cond&&cond.value===ch)opt.selected=true;
+        sel.appendChild(opt);
+      });
+      valContainer.appendChild(sel);
+    } else {
+      const inp=document.createElement('input');
+      inp.type='number';inp.placeholder='value';inp.style.flex='1';
+      if(cond&&cond.value!==undefined)inp.value=cond.value;
+      valContainer.appendChild(inp);
+    }
+  }
+
+  fieldSel.addEventListener('change',()=>{updateOpAndVal();});
+  updateOpAndVal();
+
+  const removeBtn=document.createElement('button');
+  removeBtn.className='cond-remove';removeBtn.innerHTML='×';
+  removeBtn.onclick=()=>div.remove();
+
+  div.appendChild(fieldSel);div.appendChild(opSel);div.appendChild(valContainer);div.appendChild(removeBtn);
+  container.appendChild(div);
+}
+
+function saveBucket(){
+  const name=document.getElementById('bkt-name').value.trim();
+  if(!name){alert('Please enter a bucket name.');return;}
+  const color=document.querySelector('.color-swatch.selected')?.dataset.color||SWATCH_COLORS[0];
+
+  // Collect conditions
+  const conditions=[];
+  document.querySelectorAll('#cond-rows .cond-row').forEach(row=>{
+    const field=row.querySelectorAll('select')[0]?.value;
+    const op=row.querySelectorAll('select')[1]?.value;
+    const valEl=row.querySelector('.cond-val select')||row.querySelector('.cond-val input');
+    const value=valEl?valEl.value.trim():'';
+    if(field&&op&&value!=='')conditions.push({field,op,value});
+  });
+
+  if(!conditions.length){alert('Add at least one condition.');return;}
+
+  if(editingBucketId){
+    const i=buckets.findIndex(b=>b.id===editingBucketId);
+    if(i>=0)buckets[i]={...buckets[i],name,color,conditions};
+  } else {
+    buckets.push({id:'b-'+Date.now(),name,color,conditions});
+  }
+
+  saveToGH();closeM('bucket-mo');renderWorkflow();
+}
+
+function deleteBucket(){
+  if(!editingBucketId)return;
+  if(!confirm('Delete this bucket?'))return;
+  buckets=buckets.filter(b=>b.id!==editingBucketId);
+  saveToGH();closeM('bucket-mo');renderWorkflow();
+}
+
+// ═══════════════════════════════════════════════════════════
+// MISC
+// ═══════════════════════════════════════════════════════════
+function fmt$(v,sign=false){
+  const n=parseFloat(v);
+  if(isNaN(n))return '—';
+  const abs=Math.abs(n).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+  if(sign)return (n>=0?'+$':'-$')+abs;
+  return '$'+abs;
+}
+
+function showPage(id,btn){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nbtn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('page-'+id).classList.add('active');
+  if(btn)btn.classList.add('active');
+  renderAll();
+}
+
+function openM(id){document.getElementById(id).classList.add('open');}
+function closeM(id){document.getElementById(id).classList.remove('open');}
+document.querySelectorAll('.mo').forEach(m=>m.addEventListener('click',e=>{if(e.target===m)m.classList.remove('open');}));
+
+
+// Migrate existing saved buckets to new default order if they're the default set
+function migrateBucketOrder(){
+  const defaultIds = ['b-urgent','b-take-profits','b-early-close','b-warning','b-working'];
+  const savedIds = buckets.map(b=>b.id);
+  const isDefaultSet = defaultIds.every(id=>savedIds.includes(id)) && savedIds.every(id=>defaultIds.includes(id));
+  if(!isDefaultSet) return; // user has custom buckets — don't touch
+  // Fix Urgent threshold if still at old value (35 → 50)
+  const urgent = buckets.find(b=>b.id==='b-urgent');
+  if(urgent){
+    urgent.conditions = urgent.conditions.map(c=>
+      c.field==='pop' && c.op==='<' && c.value==='35' ? {...c, value:'50'} : c
+    );
+  }
+  const alreadyOrdered = JSON.stringify(savedIds) === JSON.stringify(defaultIds);
+  if(alreadyOrdered && urgent?.conditions[0]?.value==='50') return;
+  // Reorder to match new default order
+  buckets = defaultIds.map(id=>buckets.find(b=>b.id===id)).filter(Boolean);
+  saveToGH();
+}
+
+function resetWFCols(){
+  wfColOrder=WF_COLS.map(c=>c.key);
+  wfColWidths={};
+  wfColHidden={};
+  wfSortState={};
+  saveToGH();
+  renderWorkflow();
+}
+
+
+// Ensure column state is consistent after load or when new columns are added
+function sanitizeColState(){
+  // Add any new ALL_COLS keys not in colOrder
+  ALL_COLS.forEach(c=>{ if(!colOrder.includes(c.key)) colOrder.push(c.key); });
+  // Un-hide any columns in ESSENTIAL_COLS that got stuck hidden
+  ESSENTIAL_COLS.forEach(k=>{ delete colHidden[k]; });
+  // Add any new WF_COLS keys not in wfColOrder
+  if(!wfColOrder.length) wfColOrder=WF_COLS.map(c=>c.key);
+  else { WF_COLS.forEach(c=>{ if(!wfColOrder.includes(c.key)) wfColOrder.push(c.key); }); }
+}
+
+function renderAll(){renderPositions();renderWorkflow();}
+
+function exportJSON(){
+  const b=new Blob([JSON.stringify({positions,buckets},null,2)],{type:'application/json'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='wheel-tracker-'+today()+'.json';a.click();
+}
+
+function clearAll(){
+  if(!confirm('Delete ALL data?'))return;
+  positions=[];buckets=DEFAULT_BUCKETS;colWidths={};posImportDate='';ghSha=null;
+  saveToGH();renderAll();
+}
+
+// ═══════════════════════════════════════════════════════════
+// COLUMN PANEL
+// ═══════════════════════════════════════════════════════════
+const ESSENTIAL_COLS = ['_cb','Symbol','_bucket','_type','Call/Put','Quantity','Strike Price','Exp Date','DTE',"D's Opn",'Trade Price','Mark','P/L Open','P/L Opn%','_pae','_pae_pct','PoP','β Delta','/ Delta','Underlying Last Price','_actions'];
+
+function toggleColPanel(){
+  const panel = document.getElementById('col-panel');
+  const isOpen = panel.style.display !== 'none';
+  if(isOpen){ closeColPanel(); return; }
+  renderColChecklist();
+  panel.style.display = 'block';
+  // close on outside click
+  setTimeout(()=>{
+    document.addEventListener('click', outsideColPanel);
+  }, 10);
+}
+
+function closeColPanel(){
+  document.getElementById('col-panel').style.display='none';
+  document.removeEventListener('click', outsideColPanel);
+}
+
+function outsideColPanel(e){
+  const panel = document.getElementById('col-panel');
+  const btn = document.getElementById('col-panel-btn');
+  if(!panel.contains(e.target) && !btn.contains(e.target)){
+    closeColPanel();
+  }
+}
+
+function renderColChecklist(){
+  const list = document.getElementById('col-checklist');
+  // Show toggleable cols in current colOrder
+  const toggleable = colOrder.map(k=>ALL_COLS.find(c=>c.key===k)).filter(c=>c&&!c.fixed);
+  list.innerHTML = toggleable.map(col=>{
+    const hidden = colHidden[col.key];
+    return `<div class="col-check-row" draggable="true" data-col="${col.key}"
+      ondragstart="colDragStart(event,this)"
+      ondragover="colDragOver(event,this)"
+      ondragleave="colDragLeave(this)"
+      ondrop="colDrop(event,this)"
+      style="display:flex;align-items:center;gap:7px;padding:4px 3px;border-radius:5px;cursor:grab">
+      <span style="color:var(--tx3);font-size:12px;cursor:grab">⠿</span>
+      <input type="checkbox" ${hidden?'':'checked'} style="width:14px;height:14px;accent-color:var(--blue);cursor:pointer"
+        onchange="toggleColVisibility('${col.key}',this.checked)">
+      <span style="font-size:12px;flex:1">${col.label||col.key}</span>
+    </div>`;
+  }).join('');
+}
+
+function toggleColVisibility(key, visible){
+  if(visible) delete colHidden[key];
+  else colHidden[key] = true;
+  renderPositions();
+  saveToGH();
+}
+
+function applyPreset(preset){
+  if(preset==='essential'){
+    // Hide all non-essential
+    ALL_COLS.forEach(c=>{
+      if(!c.fixed && !ESSENTIAL_COLS.includes(c.key)) colHidden[c.key]=true;
+      else delete colHidden[c.key];
+    });
+  } else {
+    colHidden={};
+  }
+  renderColChecklist();
+  renderPositions();
+  saveToGH();
+}
+
+// Drag to reorder within the column checklist
+let colDragKey = null;
+function colDragStart(e, el){
+  colDragKey = el.dataset.col;
+  el.style.opacity = '0.4';
+  e.dataTransfer.effectAllowed = 'move';
+}
+function colDragOver(e, el){
+  e.preventDefault();
+  el.style.background = 'var(--bbg)';
+}
+function colDragLeave(el){ el.style.background = ''; }
+function colDrop(e, el){
+  e.preventDefault();
+  el.style.background = '';
+  const toKey = el.dataset.col;
+  if(!colDragKey || colDragKey===toKey) return;
+  const fi = colOrder.indexOf(colDragKey);
+  const ti = colOrder.indexOf(toKey);
+  if(fi<0||ti<0) return;
+  colOrder.splice(fi,1);
+  colOrder.splice(ti,0,colDragKey);
+  colDragKey=null;
+  renderColChecklist();
+  renderPositions();
+  saveToGH();
+}
+// reset opacity on dragend
+document.addEventListener('dragend', e=>{
+  if(e.target.classList?.contains('col-check-row')) e.target.style.opacity='';
+});
+
+
+// ═══════════════════════════════════════════════════════════
+// BUCKET DRAG-TO-REORDER
+// ═══════════════════════════════════════════════════════════
+let bucketDraggingId = null;
+
+function bucketDragStart(e, el){
+  bucketDraggingId = el.dataset.bucketId;
+  // Delay so the drag image renders before opacity drops
+  setTimeout(()=>el.classList.add('dragging'), 0);
+  e.dataTransfer.effectAllowed = 'move';
+}
+
+function bucketDragOver(e, el){
+  e.preventDefault();
+  if(el.dataset.bucketId === bucketDraggingId) return;
+  el.classList.add('drag-over');
+}
+
+function bucketDragLeave(el){
+  el.classList.remove('drag-over');
+}
+
+function bucketDrop(e, el){
+  e.preventDefault();
+  el.classList.remove('drag-over');
+  const toId = el.dataset.bucketId;
+  if(!bucketDraggingId || bucketDraggingId === toId) return;
+  const fi = buckets.findIndex(b=>b.id===bucketDraggingId);
+  const ti = buckets.findIndex(b=>b.id===toId);
+  if(fi<0||ti<0) return;
+  const [moved] = buckets.splice(fi,1);
+  buckets.splice(ti,0,moved);
+  bucketDraggingId = null;
+  saveToGH();
+  renderWorkflow();
+}
+
+function bucketDragEnd(el){
+  el.classList.remove('dragging');
+  // Clean up any leftover drag-over states
+  document.querySelectorAll('.wf-bucket.drag-over').forEach(b=>b.classList.remove('drag-over'));
+}
+
+</script>
+</body>
+</html>
