@@ -2050,12 +2050,12 @@
     "Symbol",
     "_bucket",
     "Call/Put",
+    "Quantity",
     "DTE",
     "P/L Opn%",
     "P/L Open",
     "P/L Day",
     "Strike Price",
-    "Quantity",
     "Exp Date",
     "D's Opn",
     "Trade Price",
@@ -2078,5 +2078,5 @@
   ],
   "wfColWidths": {},
   "wfColHidden": {},
-  "updated": "2026-03-20T14:12:58.433Z"
+  "updated": "2026-03-20T14:13:01.672Z"
 }
