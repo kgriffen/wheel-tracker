@@ -672,12 +672,22 @@ function deriveFields(p){
   }
 
   // Profit At Expiration — assumes underlying holds current price to expiry
+  // Short: PAE = credit received - intrinsic loss at expiry
+  // Long:  PAE = intrinsic value at expiry - debit paid
   let pae=null, paePct=null;
-  if((p['Type']||'')!=='FUTURES_OPTION' && qty!==null && qty<0 && strike!==null && last!==null && last>0 && cost!==null && cost>0){
+  if((p['Type']||'')!=='FUTURES_OPTION' && qty!==null && strike!==null && last!==null && last>0 && cost!==null){
     const cp2=p['Call/Put']||'';
     const intrinsic=cp2==='Put'?Math.max(0,strike-last):Math.max(0,last-strike);
-    pae=Math.round((cost-(intrinsic*Math.abs(qty)*100))*100)/100;
-    paePct=Math.round((pae/cost)*1000)/10;
+    if(qty<0 && cost>0){
+      // Short: credit collected minus intrinsic loss
+      pae=Math.round((cost-(intrinsic*Math.abs(qty)*100))*100)/100;
+      paePct=Math.round((pae/cost)*1000)/10;
+    } else if(qty>0){
+      // Long: intrinsic value received minus debit paid
+      const absCost=Math.abs(cost);
+      pae=Math.round(((intrinsic*Math.abs(qty)*100)-absCost)*100)/100;
+      paePct=absCost>0?Math.round((pae/absCost)*1000)/10:null;
+    }
   }
 
   // Ann Yield: (Cost / (DTE + DaysOpn)) * (365 / Cost) = 365 / (DTE + DaysOpn) — simplified
@@ -1459,14 +1469,17 @@ function spreadAggregate(legs) {
   const avgPoP = (() => { const ps = legs.filter(l => cleanNum(l['PoP']) != null); return ps.length ? Math.round(ps.reduce((s,l) => s+(cleanNum(l['PoP'])||0),0)/ps.length) : null; })();
   const totalMark = legs.reduce((s, l) => s + (cleanNum(l['Mark'])||0)*(Math.abs(cleanNum(l['Quantity'])||0))*100, 0);
 
-  // PAE for spread: sum of individual PAEs
+  // PAE for spread: sum of ALL leg PAEs (short AND long)
+  // Long leg PAE = intrinsic at expiry - debit paid (correctly offsets the spread)
   let pae = null;
   legs.forEach(l => {
     const d = deriveFields(l);
     if(d.pae !== null) {
-      pae = (pae || 0) + d.pae;
+      pae = (pae === null ? 0 : pae) + d.pae;
     }
   });
+  // PAE% uses net cost (totalCost = net credit for credit spreads, net debit for debit spreads)
+  // Use absolute net cost so the percentage makes sense in both directions
   const paePct = (pae !== null && totalCost !== 0) ? Math.round((pae / Math.abs(totalCost)) * 1000) / 10 : null;
 
   return { totalCost, totalPLOpen, plPct, minDTE, avgPoP, pae, paePct, totalMark };
