@@ -1715,16 +1715,21 @@ function renderWFStats(list){
   const avgPop=open.filter(p=>cleanNum(p['PoP'])!=null).length
     ?Math.round(open.filter(p=>cleanNum(p['PoP'])!=null).reduce((s,p)=>s+(cleanNum(p['PoP'])||0),0)/open.filter(p=>cleanNum(p['PoP'])!=null).length):null;
 
-  // Per-bucket counts using same matching logic as renderWorkflow
-  const matched=new Set();
+  // Per-bucket counts — use SAME item-based logic as renderWorkflow
+  // buildDisplayItems groups spread legs into single items so counts match
+  const statsItems=buildDisplayItems(list);
+  const statsMatched=new Set();
   const bucketCounts={};
   buckets.forEach(b=>{
     bucketCounts[b.id]=0;
-    list.forEach(p=>{
-      if(!matched.has(p)&&matchesBucket(p,b)){ bucketCounts[b.id]++; matched.add(p); }
+    statsItems.forEach(item=>{
+      if(!statsMatched.has(item)){
+        const hits=item.isSpread?spreadMatchesBucket(item.legs,b):matchesBucket(item.position,b);
+        if(hits){ bucketCounts[b.id]++; statsMatched.add(item); }
+      }
     });
   });
-  const uncatCount=list.filter(p=>!matched.has(p)).length;
+  const uncatCount=statsItems.filter(item=>!statsMatched.has(item)).length;
 
   const bucketWidgets=buckets.map(b=>`
     <div class="stat" style="cursor:pointer" onclick="document.querySelector('[data-bucket-id=\'${b.id}\']')?.scrollIntoView({behavior:'smooth',block:'nearest'})">
@@ -1736,7 +1741,7 @@ function renderWFStats(list){
     </div>`).join('');
 
   document.getElementById('wf-stats').innerHTML=`
-    <div class="stat"><div class="sl">Total</div><div class="sv">${list.length}</div><div class="ss">${open.length} short</div></div>
+    <div class="stat"><div class="sl">Total</div><div class="sv">${statsItems.length}</div><div class="ss">${open.length} short</div></div>
     <div class="stat"><div class="sl">P/L Open</div><div class="sv ${totalPL>=0?'cg':'cr'}" style="font-size:16px">${fmt$(totalPL,true)}</div></div>
     <div class="stat"><div class="sl">Avg PoP</div><div class="sv ${avgPop>=65?'cg':avgPop>=50?'ca':'cr'}">${avgPop!==null?avgPop+'%':'—'}</div></div>
     <div class="stat"><div class="sl">ITM</div><div class="sv ${itm>0?'cr':'cg'}">${itm}</div></div>
