@@ -3031,7 +3031,7 @@
     "_capital": 220
   },
   "colHidden": {},
-  "posImportDate": "3/20/2026, 9:50:55 AM",
+  "posImportDate": "3/20/2026, 10:31:00 AM",
   "wfColOrder": [
     "Symbol",
     "_bucket",
@@ -3051,16 +3051,17 @@
     "PoP",
     "IV Rank",
     "Underlying Last Price",
-    "ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ² Delta",
-    "Î² Delta",
+    "ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ² Delta",
+    "ÃÂ² Delta",
     "/ Delta",
     "Theta",
     "Cost",
     "_type",
+    "ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ² Delta",
     "ÃÂÃÂÃÂÃÂ² Delta",
     "ÃÂÃÂ² Delta",
-    "ÃÂ² Delta",
     "Sector",
+    "Î² Delta",
     "β Delta"
   ],
   "wfColWidths": {
@@ -3068,5 +3069,5 @@
     "Exp Date": 67
   },
   "wfColHidden": {},
-  "updated": "2026-03-20T16:50:55.607Z"
+  "updated": "2026-03-20T17:31:00.943Z"
 }
