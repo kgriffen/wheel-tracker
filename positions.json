@@ -2049,6 +2049,7 @@
   "wfColOrder": [
     "Symbol",
     "_bucket",
+    "DTE",
     "_type",
     "P/L Opn%",
     "P/L Open",
@@ -2056,7 +2057,6 @@
     "Strike Price",
     "Quantity",
     "Exp Date",
-    "DTE",
     "D's Opn",
     "Trade Price",
     "Mark",
@@ -2078,5 +2078,5 @@
   ],
   "wfColWidths": {},
   "wfColHidden": {},
-  "updated": "2026-03-20T14:11:48.994Z"
+  "updated": "2026-03-20T14:11:55.626Z"
 }
