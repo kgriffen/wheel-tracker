@@ -2993,6 +2993,11 @@
           "field": "days_opn",
           "op": ">",
           "value": "3"
+        },
+        {
+          "field": "early_profit",
+          "op": "=",
+          "value": "true"
         }
       ]
     },
@@ -3068,5 +3073,5 @@
     "Exp Date": 67
   },
   "wfColHidden": {},
-  "updated": "2026-03-20T16:24:44.494Z"
+  "updated": "2026-03-20T16:25:01.635Z"
 }
