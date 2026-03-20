@@ -1047,7 +1047,6 @@ function renderPosStats(list){
 
   const avgPop=()=>{const ps=all.filter(p=>cleanNum(p['PoP'])!=null);return ps.length?Math.round(ps.reduce((s,p)=>s+(cleanNum(p['PoP'])||0),0)/ps.length):null;};
   const itmCount=all.filter(p=>deriveFields(p).itmOtm==='ITM').length;
-  const earlyClose=all.filter(p=>deriveFields(p).earlyProfit).length;
   const pop=avgPop();
   document.getElementById('pos-stats').innerHTML=`
     <div class="stat"><div class="sl">Positions</div><div class="sv">${shorts.length} <span style="font-size:13px;color:var(--tx3)">short</span></div><div class="ss">${all.length} total</div></div>
@@ -1057,7 +1056,7 @@ function renderPosStats(list){
     <div class="stat"><div class="sl">P/L Open</div><div class="sv ${totalPL>=0?'cg':'cr'}" style="font-size:16px">${fmt$(totalPL,true)}</div></div>
     <div class="stat"><div class="sl">Avg PoP</div><div class="sv ${pop>=65?'cg':pop>=50?'ca':'cr'}">${pop!==null?pop+'%':'—'}</div></div>
     <div class="stat"><div class="sl">ITM</div><div class="sv ${itmCount>0?'cr':'cg'}">${itmCount}</div><div class="ss">of ${all.length}</div></div>
-    ${earlyClose>0?`<div class="stat"><div class="sl">Early close ⚡</div><div class="sv cb">${earlyClose}</div><div class="ss">rule met</div></div>`:''}
+
   `;
 }
 
