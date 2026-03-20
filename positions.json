@@ -3019,11 +3019,6 @@
       "color": "#185FA5",
       "conditions": [
         {
-          "field": "itm_otm",
-          "op": "=",
-          "value": "OTM"
-        },
-        {
           "field": "pop",
           "op": ">=",
           "value": "65"
@@ -3073,5 +3068,5 @@
     "Exp Date": 67
   },
   "wfColHidden": {},
-  "updated": "2026-03-20T16:25:01.635Z"
+  "updated": "2026-03-20T16:26:28.247Z"
 }
