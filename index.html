@@ -480,7 +480,7 @@ const ALL_COLS = [
   {key:'Cost',      label:'Cost',      width:75,  sortable:true,  fmt:'money'},
   {key:'Ext',       label:'Ext Val',   width:75,  sortable:true,  fmt:'money'},
   {key:'_ann_yield',label:'Ann Yield', width:70,  sortable:true,  fmt:'ann-yield'},
-  {key:'_capital',  label:'Capital',   width:80,  sortable:true,  fmt:'capital'},
+  {key:'_capital',  label:'Notional',  width:80,  sortable:true,  fmt:'capital'},
   {key:'P/L Open',  label:'P/L $',     width:75,  sortable:true,  fmt:'pl-money'},
   {key:'P/L Opn%',  label:'P/L %',     width:60,  sortable:true,  fmt:'pl-pct'},
   {key:'_pae',      label:'PAE $',      width:75,  sortable:true,  fmt:'pae-money'},
@@ -980,7 +980,13 @@ function renderPosStats(list){
   const shorts=all.filter(p=>cleanNum(p['Quantity'])<0);
   const totalCost=shorts.reduce((s,p)=>s+(cleanNum(p['Cost'])||0),0);
   const totalPL=all.reduce((s,p)=>s+(cleanNum(p['P/L Open'])||0),0);
-  const totalCapital=shorts.reduce((s,p)=>{
+  // Notional exposure: use unique short legs only (avoid double-counting spread legs)
+  // buildDisplayItems groups spreads, so we sum from the flat unique positions set
+  const uniqueShorts=new Set();
+  buildDisplayItems(all).forEach(item=>item.legs.forEach(l=>{
+    if(cleanNum(l['Quantity'])<0) uniqueShorts.add(l);
+  }));
+  const totalCapital=[...uniqueShorts].reduce((s,p)=>{
     const str=cleanNum(p['Strike Price']),qty=Math.abs(cleanNum(p['Quantity'])||0);
     const isF=(p['Type']||'')==='FUTURES_OPTION';
     return s+(!isF&&str?str*100*qty:0);
@@ -1001,7 +1007,7 @@ function renderPosStats(list){
   document.getElementById('pos-stats').innerHTML=`
     <div class="stat"><div class="sl">Positions</div><div class="sv">${shorts.length} <span style="font-size:13px;color:var(--tx3)">short</span></div><div class="ss">${all.length} total</div></div>
     <div class="stat"><div class="sl">Total premium</div><div class="sv cg" style="font-size:16px">${fmt$(totalCost)}</div></div>
-    <div class="stat"><div class="sl">Capital used</div><div class="sv cg" style="font-size:16px">${totalCapital>0?fmt$(totalCapital):'—'}</div></div>
+    <div class="stat"><div class="sl">Notional exposure</div><div class="sv cg" style="font-size:16px">${totalCapital>0?fmt$(totalCapital):'—'}</div></div>
     <div class="stat"><div class="sl">Avg ann yield</div><div class="sv ${wAnnYield>=20?'cg':wAnnYield>=10?'ca':''}">${wAnnYield!==null?wAnnYield+'%':'—'}</div></div>
     <div class="stat"><div class="sl">P/L Open</div><div class="sv ${totalPL>=0?'cg':'cr'}" style="font-size:16px">${fmt$(totalPL,true)}</div></div>
     <div class="stat"><div class="sl">Avg PoP</div><div class="sv ${pop>=65?'cg':pop>=50?'ca':'cr'}">${pop!==null?pop+'%':'—'}</div></div>
