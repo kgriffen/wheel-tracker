@@ -1190,13 +1190,33 @@ function renderPosBody(list){
         if(col.key==='Call/Put') return `<td style="${style}"><span style="font-size:11px;color:var(--tx3)">—</span></td>`;
         if(col.key==='Strike Price') return `<td style="${style}"><span style="font-size:11px;color:var(--tx3)">—</span></td>`;
         if(col.key==='Quantity') return `<td style="${style};text-align:right"><span class="mono">${item.legs.reduce((s,l)=>s+Math.abs(parseInt(l['Quantity']||0)),0)}</span></td>`;
-        if(col.key==='DTE') return `<td style="${style};text-align:right"><span class="mono${agg.minDTE<=7?' cr':agg.minDTE<=14?' ca':''}">${agg.minDTE<999?agg.minDTE+'d':'—'}</span></td>`;
+        if(col.key==='Exp Date') return `<td style="${style}">${agg.sharedExp||'—'}</td>`;
+        if(col.key==='DTE') return `<td style="${style};text-align:right"><span class="mono${(agg.sharedDTE?parseDays(agg.sharedDTE):agg.minDTE)<=7?' cr':(agg.sharedDTE?parseDays(agg.sharedDTE):agg.minDTE)<=14?' ca':''}">${agg.sharedDTE||( agg.minDTE<999?agg.minDTE+'d':'—')}</span></td>`;
         if(col.key==='Cost') return `<td style="${style};text-align:right"><span class="mono ${agg.totalCost>=0?'cg':'cr'}">${agg.totalCost>=0?'$':'-$'}${Math.abs(agg.totalCost).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}</span></td>`;
         if(col.key==='P/L Open') return `<td style="${style};text-align:right"><span class="mono ${plCls}">${agg.totalPLOpen>=0?'+$':'-$'}${Math.abs(agg.totalPLOpen).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}</span></td>`;
         if(col.key==='P/L Opn%') return `<td style="${style};text-align:right"><span class="mono ${plPctCls}">${agg.plPct!==null?agg.plPct.toFixed(1)+'%':'—'}</span></td>`;
         if(col.key==='PoP') return `<td style="${style};text-align:right"><span class="mono ${popCls}" style="font-weight:500">${agg.avgPoP!==null?agg.avgPoP+'%':'—'}</span></td>`;
         if(col.key==='_pae') return `<td style="${style};text-align:right"><span class="mono ${paeCls}">${agg.pae!==null?(agg.pae>=0?'+$':'-$')+Math.abs(agg.pae).toFixed(2):'—'}</span></td>`;
         if(col.key==='_pae_pct') return `<td style="${style};text-align:right"><span class="mono ${paePctCls}" style="font-weight:500">${agg.paePct!==null?agg.paePct.toFixed(1)+'%':'—'}</span></td>`;
+        if(col.key==='P/L Day'){
+          const n=agg.totalPLDay;
+          const cls=n>=0?'cg':'cr';
+          return `<td style="${style};text-align:right"><span class="mono ${cls}">${n>=0?'+$':'-$'}${Math.abs(n).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}</span></td>`;
+        }
+        if(col.key==='Underlying Last Price'){
+          return `<td style="${style};text-align:right">${agg.lastPrice!==null?`<span class="mono">${agg.lastPrice.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}</span>`:'—'}</td>`;
+        }
+        if(col.key==='/ Delta'){
+          const n=agg.totalDelta;
+          return `<td style="${style};text-align:right"><span class="mono">${n.toFixed(2)}</span></td>`;
+        }
+        if(col.key==='Theta'){
+          const n=agg.totalTheta;
+          return `<td style="${style};text-align:right"><span class="mono">${n.toFixed(2)}</span></td>`;
+        }
+        // Blank for blended columns (Trade Price, Mark, β Delta, etc.)
+        const blankCols=new Set(['Trade Price','Mark','β Delta','IV Rank','Vega','Gamma','Beta','Ext RoR %','Ext']);
+        if(blankCols.has(col.key)) return `<td style="${style}"></td>`;
         return `<td style="${style}"></td>`;
       }).join('');
 
@@ -1216,7 +1236,7 @@ function renderPosBody(list){
           if(col.key==='_type') return `<td style="${style}"></td>`;
           const val=col.key==='_pae'?'__pae__':col.key==='_pae_pct'?'__pae_pct__':col.key==='_ann_yield'?'__ann_yield__':col.key==='_capital'?'__capital__':p[col.key];
           const html=fmtCell(col,val,derived,p);
-          const align=['money','pl-money','pl-pct','pop','num1','num2','num3','pct','pct-chg','price2','price4','qty','dte','days'].includes(col.fmt)?'text-align:right':'';
+          const align=['money','pl-money','pl-pct','pop','num1','num2','num3','pct','pct-chg','price2','price4','qty','dte','days','pae-money','pae-pct','ann-yield','capital'].includes(col.fmt)?'text-align:right':'';
           return `<td data-col="${col.key}" style="${style};${align}">${html}</td>`;
         }).join('');
         rows.push(`<tr class="spread-leg" data-spread="${spreadId}" style="display:none;background:#FAFDF8">${legCells}</tr>`);
@@ -1531,7 +1551,28 @@ function spreadAggregate(legs) {
   // Use absolute net cost so the percentage makes sense in both directions
   const paePct = (pae !== null && totalCost !== 0) ? Math.round((pae / Math.abs(totalCost)) * 1000) / 10 : null;
 
-  return { totalCost, totalPLOpen, plPct, minDTE, avgPoP, pae, paePct, totalMark };
+  // P/L Day: sum across all legs
+  const totalPLDay = legs.reduce((s,l) => s + (cleanNum(l['P/L Day'])||0), 0);
+
+  // Delta: raw sum of / Delta values (no qty weighting)
+  const totalDelta = legs.reduce((s,l) => {
+    const d = cleanNum(l['/ Delta']);
+    return s + (d !== null ? d : 0);
+  }, 0);
+
+  // Theta: raw sum
+  const totalTheta = legs.reduce((s,l) => s + (cleanNum(l['Theta'])||0), 0);
+
+  // Last: underlying last price (same for all legs, take first non-null)
+  const lastPrice = (() => { const l = legs.find(x => cleanNum(x['Underlying Last Price']) !== null); return l ? cleanNum(l['Underlying Last Price']) : null; })();
+
+  // EXP/DTE: show if all legs share same expiration (same-exp spreads)
+  const allSameExp = legs.every(l => l['Exp Date'] === legs[0]['Exp Date']);
+  const sharedExp = allSameExp ? legs[0]['Exp Date'] : null;
+  const sharedDTE = allSameExp ? legs[0]['DTE'] : null;
+
+  return { totalCost, totalPLOpen, plPct, minDTE, avgPoP, pae, paePct, totalMark,
+           totalPLDay, totalDelta, totalTheta, lastPrice, sharedExp, sharedDTE };
 }
 
 // For bucket matching on a spread: evaluate bucket against spread aggregate
@@ -1893,7 +1934,7 @@ function renderWFTable(itemsOrLegs, bucketId, currentBucket){
   const TD = (style,align,html) =>
     `<td style="${style};${align?'text-align:right':''};padding:6px 8px;border-bottom:1px solid var(--bdr);border-right:1px solid var(--bdr);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;vertical-align:middle;font-size:12px">${html}</td>`;
 
-  const ALIGNS = new Set(['money','pl-money','pl-pct','pop','num1','num2','price2','price4','qty','dte','days']);
+  const ALIGNS = new Set(['money','pl-money','pl-pct','pop','num1','num2','price2','price4','qty','dte','days','pae-money','pae-pct','ann-yield','capital']);
 
   const tbody = sortedItems.map((item, iidx) => {
     if(item.isSpread) {
@@ -1912,13 +1953,28 @@ function renderWFTable(itemsOrLegs, bucketId, currentBucket){
         if(col.key==='_type') return TD(s,false, strategyTag(item.type));
         if(col.key==='Call/Put'||col.key==='Strike Price') return TD(s,true,'<span style="color:var(--tx3)">—</span>');
         if(col.key==='Quantity') return TD(s,true,`<span class="mono">${item.legs.reduce((s,l)=>s+Math.abs(parseInt(l['Quantity']||0)),0)}</span>`);
-        if(col.key==='DTE') return TD(s,true,`<span class="mono${agg.minDTE<=7?' cr':agg.minDTE<=14?' ca':''}">${agg.minDTE<999?agg.minDTE+'d':'—'}</span>`);
+        if(col.key==='Exp Date') return TD(s,false, agg.sharedExp||'—');
+        if(col.key==='DTE') return TD(s,true,`<span class="mono${(agg.sharedDTE?parseDays(agg.sharedDTE):agg.minDTE)<=7?' cr':(agg.sharedDTE?parseDays(agg.sharedDTE):agg.minDTE)<=14?' ca':''}">${agg.sharedDTE||(agg.minDTE<999?agg.minDTE+'d':'—')}</span>`);
         if(col.key==='Cost') return TD(s,true,`<span class="mono ${agg.totalCost>=0?'cg':'cr'}">${agg.totalCost>=0?'$':'-$'}${Math.abs(agg.totalCost).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}</span>`);
         if(col.key==='P/L Open') return TD(s,true,`<span class="mono ${plCls}">${agg.totalPLOpen>=0?'+$':'-$'}${Math.abs(agg.totalPLOpen).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}</span>`);
         if(col.key==='P/L Opn%') return TD(s,true,`<span class="mono ${plCls}">${agg.plPct!==null?agg.plPct.toFixed(1)+'%':'—'}</span>`);
         if(col.key==='PoP') return TD(s,true,`<span class="mono ${agg.avgPoP>=65?'cg':agg.avgPoP>=50?'ca':'cr'}" style="font-weight:500">${agg.avgPoP!==null?agg.avgPoP+'%':'—'}</span>`);
         if(col.key==='_pae') return TD(s,true,`<span class="mono ${agg.pae>=0?'cg':'cr'}">${agg.pae!==null?(agg.pae>=0?'+$':'-$')+Math.abs(agg.pae).toFixed(2):'—'}</span>`);
         if(col.key==='_pae_pct') return TD(s,true,`<span class="mono ${paePctCls}" style="font-weight:500">${agg.paePct!==null?agg.paePct.toFixed(1)+'%':'—'}</span>`);
+        if(col.key==='P/L Day'){
+          const n=agg.totalPLDay;
+          const cls=n>=0?'cg':'cr';
+          return TD(s,true,`<span class="mono ${cls}">${n>=0?'+$':'-$'}${Math.abs(n).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}</span>`);
+        }
+        if(col.key==='Underlying Last Price'){
+          return TD(s,true,agg.lastPrice!==null?`<span class="mono">${agg.lastPrice.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}</span>`:'—');
+        }
+        if(col.key==='/ Delta'){
+          return TD(s,true,`<span class="mono">${agg.totalDelta.toFixed(2)}</span>`);
+        }
+        if(col.key==='Theta'){
+          return TD(s,true,`<span class="mono">${agg.totalTheta.toFixed(2)}</span>`);
+        }
         return TD(s,align,'');
       }).join('');
 
