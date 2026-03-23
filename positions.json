@@ -2492,8 +2492,9 @@
   ],
   "wfColWidths": {
     "Strike Price": 49,
-    "Exp Date": 67
+    "Exp Date": 67,
+    "_type": 40
   },
   "wfColHidden": {},
-  "updated": "2026-03-23T18:34:24.844Z"
+  "updated": "2026-03-23T18:34:27.364Z"
 }
