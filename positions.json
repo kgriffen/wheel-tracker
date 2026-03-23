@@ -2441,23 +2441,6 @@
       ]
     },
     {
-      "id": "b-early-close",
-      "name": "Early Close Rule",
-      "color": "#1D9E75",
-      "conditions": [
-        {
-          "field": "days_opn",
-          "op": ">",
-          "value": "3"
-        },
-        {
-          "field": "early_profit",
-          "op": "=",
-          "value": "true"
-        }
-      ]
-    },
-    {
       "id": "b-warning",
       "name": "Warning",
       "color": "#EF9F27",
@@ -2530,5 +2513,5 @@
     "_type": 63
   },
   "wfColHidden": {},
-  "updated": "2026-03-23T20:09:14.791Z"
+  "updated": "2026-03-23T20:10:09.316Z"
 }
