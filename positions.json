@@ -2448,7 +2448,7 @@
         {
           "field": "pae_pct",
           "op": "<",
-          "value": "50"
+          "value": "100"
         },
         {
           "field": "pae_pct",
@@ -2519,5 +2519,5 @@
     "_type": 63
   },
   "wfColHidden": {},
-  "updated": "2026-03-23T20:16:01.427Z"
+  "updated": "2026-03-23T20:16:08.604Z"
 }
