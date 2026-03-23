@@ -2422,9 +2422,9 @@
       "color": "#D85A30",
       "conditions": [
         {
-          "field": "pop",
+          "field": "pae",
           "op": "<",
-          "value": "50"
+          "value": "0"
         }
       ]
     },
@@ -2513,5 +2513,5 @@
     "_type": 63
   },
   "wfColHidden": {},
-  "updated": "2026-03-23T20:10:09.316Z"
+  "updated": "2026-03-23T20:10:32.022Z"
 }
