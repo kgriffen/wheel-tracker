@@ -1159,7 +1159,7 @@ function renderPosBody(list){
         // Override bucket rendering with item's bucket
         if(col.key==='_bucket') return `<td data-col="${col.key}" style="${style}">${bucketTag(bucket)}</td>`;
         const html=fmtCell(col,val,derived,p);
-        const align=['money','pl-money','pl-pct','pop','num1','num2','num3','pct','pct-chg','price2','price4','qty','dte','days'].includes(col.fmt)?'text-align:right':'';
+        const align=['money','pl-money','pl-pct','pop','num1','num2','num3','pct','pct-chg','price2','price4','qty','dte','days','pae-money','pae-pct','ann-yield','capital'].includes(col.fmt)?'text-align:right':'';
         return `<td data-col="${col.key}" style="${style};${align}" title="${String(val||'').replace(/"/g,'&quot;')}">${html}</td>`;
       }).join('');
       rows.push(`<tr data-ri="${ri}" class="${sel?'selected':''}">${cells}</tr>`);
