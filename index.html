@@ -1757,6 +1757,8 @@ function renderWorkflow(){
     const avgDTE=bktLegs.length?Math.round(bktLegs.reduce((s,p)=>s+(parseDays(p['DTE'])||0),0)/bktLegs.length):0;
     const popsArr=bktLegs.filter(p=>cleanNum(p['PoP'])!=null);
     const pop=popsArr.length?Math.round(popsArr.reduce((s,p)=>s+(cleanNum(p['PoP'])||0),0)/popsArr.length):null;
+    const totalPAE=bktLegs.reduce((s,p)=>{const d=deriveFields(p);return s+(d.pae!==null?d.pae:0);},0);
+    const hasPAE=bktLegs.some(p=>deriveFields(p).pae!==null);
     const condSummary=b.conditions.map(c=>{const f=COND_FIELDS.find(x=>x.value===c.field);return `${f?f.label:c.field} ${c.op} ${c.value}`;}).join(' AND ');
     const bIdx=buckets.findIndex(x=>x.id===b.id);
     return `<div class="wf-bucket" draggable="true" data-bucket-id="${b.id}"
@@ -1778,6 +1780,7 @@ function renderWorkflow(){
         <div class="wf-bmi"><div class="wf-bml">P/L Open</div><div class="wf-bmv ${totalPL>=0?'cg':'cr'}">${totalPL>=0?'+$':'-$'}${Math.abs(totalPL).toFixed(0)}</div></div>
         <div class="wf-bmi"><div class="wf-bml">Avg DTE</div><div class="wf-bmv">${avgDTE}d</div></div>
         ${pop!==null?`<div class="wf-bmi"><div class="wf-bml">Avg PoP</div><div class="wf-bmv ${pop>=65?'cg':pop>=50?'ca':'cr'}">${pop}%</div></div>`:''}
+        ${hasPAE?`<div class="wf-bmi"><div class="wf-bml">PAE $</div><div class="wf-bmv ${totalPAE>=0?'cg':'cr'}">${totalPAE>=0?'+$':'-$'}${Math.abs(totalPAE).toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:0})}</div></div>`:''}
       </div>`:''}
       <div class="wf-bbody ${list.length?'open':''}">
         ${(bucketItems[b.id]||[]).length?renderWFTable(bucketItems[b.id],b.id,b):'<div style="padding:10px 13px;font-size:12px;color:var(--tx3)">No positions match.</div>'}
