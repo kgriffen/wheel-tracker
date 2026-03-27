@@ -543,6 +543,21 @@ function parseDays(s){
 
 // Derived fields computed per-position
 function deriveFields(p){
+  // Stock/equity positions — return minimal derived fields
+  if((p['Type']||'') === 'EQUITY') {
+    const cost = cleanNum(p['Cost']);
+    const qty = cleanNum(p['Quantity']) || 0;
+    const last = cleanNum(p['Underlying Last Price']) || cleanNum(p['Mark']);
+    const plOpen = cleanNum(p['P/L Open']);
+    return {
+      itmOtm: null, strikeDist: null, earlyProfit: false,
+      pae: null, paePct: null, _annYield: null,
+      _capital: cost !== null ? Math.abs(cost) : null,
+      _stratType: 'Stock',
+      _dte: null, _daysOpn: null, _plOpen: plOpen, _plPct: cleanNum(p['P/L Opn%']),
+      _cost: cost, _pop: null, _qty: qty, _strike: null, _last: last
+    };
+  }
   const strike=cleanNum(p['Strike Price']);
   const last=cleanNum(p['Underlying Last Price']);
   const cp=p['Call/Put']||'';
@@ -690,8 +705,10 @@ function fmtCell(col,val,derived,pos){
   switch(col.fmt){
     case 'symbol':{
       const isFut=String(val).startsWith('./');
+      const isStock=(pos&&(pos['Type']||'')==='EQUITY');
       const futTag=isFut?'<span style="font-size:9px;background:var(--pbg);color:var(--pt);padding:1px 5px;border-radius:8px;margin-left:3px;font-weight:500">FUT</span>':'';
-      return `<strong style="font-size:11px">${val}</strong>${futTag}`;
+      const stkTag=isStock?'<span style="font-size:9px;background:#EDF2E0;color:#5A6A3A;padding:1px 5px;border-radius:8px;margin-left:3px;font-weight:500">STK</span>':'';
+      return `<strong style="font-size:11px">${val}</strong>${futTag}${stkTag}`;
     }
     case 'type-badge':{
       const isFut=val==='FUTURES_OPTION';
@@ -1083,7 +1100,16 @@ function renderPosBody(list){
         if(col.key==='_type') return `<td data-col="_type" style="${style}">${strategyTag(item.type)}</td>`;
         if(col.key==='Call/Put') return `<td style="${style}"><span style="font-size:11px;color:var(--tx3)">—</span></td>`;
         if(col.key==='Strike Price') return `<td style="${style}"><span style="font-size:11px;color:var(--tx3)">—</span></td>`;
-        if(col.key==='Quantity') return `<td style="${style};text-align:right"><span class="mono">${item.legs.reduce((s,l)=>s+Math.abs(parseInt(l['Quantity']||0)),0)}</span></td>`;
+        if(col.key==='Quantity') {
+          const stockLegs=item.legs.filter(l=>(l['Type']||'')==='EQUITY');
+          const optLegs=item.legs.filter(l=>(l['Type']||'')==='');
+          if(stockLegs.length && item.type==='Covered Call') {
+            const shares=stockLegs.reduce((s,l)=>s+Math.abs(parseInt(l['Quantity']||0)),0);
+            const calls=item.legs.filter(l=>(l['Type']||'')!=='EQUITY').reduce((s,l)=>s+Math.abs(parseInt(l['Quantity']||0)),0);
+            return `<td style="${style};text-align:right"><span class="mono">${shares} shares / ${calls}C</span></td>`;
+          }
+          return `<td style="${style};text-align:right"><span class="mono">${item.legs.reduce((s,l)=>s+Math.abs(parseInt(l['Quantity']||0)),0)}</span></td>`;
+        }
         if(col.key==='Exp Date') return `<td style="${style}">${agg.sharedExp||'—'}</td>`;
         if(col.key==='DTE') return `<td style="${style};text-align:right"><span class="mono${(agg.sharedDTE?parseDays(agg.sharedDTE):agg.minDTE)<=7?' cr':(agg.sharedDTE?parseDays(agg.sharedDTE):agg.minDTE)<=14?' ca':''}">${agg.sharedDTE||( agg.minDTE<999?agg.minDTE+'d':'—')}</span></td>`;
         if(col.key==='Cost') return `<td style="${style};text-align:right"><span class="mono ${agg.totalCost>=0?'cg':'cr'}">${agg.totalCost>=0?'$':'-$'}${Math.abs(agg.totalCost).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}</span></td>`;
@@ -1125,9 +1151,19 @@ function renderPosBody(list){
           const style=`width:${w}px;min-width:${w}px;max-width:${w}px`;
           if(col.key==='_cb') return `<td class="cb-col" data-col="_cb" style="${style}"><input type="checkbox" class="row-cb" data-ri="${ri}" onchange="onRowCheck(this)"></td>`;
           if(col.key==='_actions') return `<td data-col="_actions" style="${style};text-align:center"><button class="btn btn-sm" style="padding:2px 7px;font-size:11px" onclick="openEdit(${ri})">Edit</button></td>`;
-          if(col.key==='Symbol') return `<td data-col="Symbol" style="${style};padding-left:28px"><span style="font-size:11px;color:var(--tx3)">└</span> <span style="font-size:11px">${fmtSymbol(p['Symbol'])}</span></td>`;
+          if(col.key==='Symbol') return `<td data-col="Symbol" style="${style};padding-left:28px"><span style="font-size:11px;color:var(--tx3)">└</span> <span style="font-size:11px">${fmtSymbol(p['Symbol'])}</span>${(p['Type']||'')==='EQUITY'?'<span style="font-size:9px;background:#EDF2E0;color:#5A6A3A;padding:1px 5px;border-radius:6px;margin-left:4px;font-weight:500">STK</span>':''}</td>`;
           if(col.key==='_bucket') return `<td style="${style}"></td>`;
           if(col.key==='_type') return `<td style="${style}"></td>`;
+          // Stock leg: show cost basis in Strike, blank options cols
+          if((p['Type']||'')==='EQUITY') {
+            const optionOnlyCols = new Set(['Call/Put','DTE',"D's Opn",'Trade Price','PoP','IV Rank','Theta','β Delta','/ Delta','Vega','Gamma','Beta','Exp Date','Ext RoR %','Ext']);
+            if(optionOnlyCols.has(col.key)) return `<td style="${style}"><span style="color:var(--tx3)">—</span></td>`;
+            if(col.key==='Strike Price') {
+              const cost=cleanNum(p['Cost']),qty=Math.abs(cleanNum(p['Quantity'])||1);
+              const costPer=cost!==null?Math.abs(cost)/qty:null;
+              return `<td style="${style};text-align:right">${costPer!==null?`<span class="mono">$${costPer.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}</span>`:'—'}</td>`;
+            }
+          }
           const val=col.key==='_pae'?'__pae__':col.key==='_pae_pct'?'__pae_pct__':col.key==='_ann_yield'?'__ann_yield__':col.key==='_capital'?'__capital__':p[col.key];
           const html=fmtCell(col,val,derived,p);
           const align=['money','pl-money','pl-pct','pop','num1','num2','num3','pct','pct-chg','price2','price4','qty','dte','days','pae-money','pae-pct','ann-yield','capital'].includes(col.fmt)?'text-align:right':'';
@@ -1285,6 +1321,7 @@ const COND_FIELDS=[
 const STRATEGY_STYLES = {
   'Naked Put':           {color:'#185FA5', bg:'#EAF1FB'},
   'Naked Call':          {color:'#534AB7', bg:'#EEEDFE'},
+  'Stock':               {color:'#5A6A3A', bg:'#EDF2E0'},
   'Covered Call':        {color:'#0F9B8E', bg:'#E0F5F3'},
   'Strangle':            {color:'#7B3FA0', bg:'#F3E8FF'},
   'Jade Lizard':         {color:'#C26D1A', bg:'#FEF0DC'},
@@ -1312,6 +1349,8 @@ function classifyLegs(legs) {
     const l = legs[0];
     const qty = parseInt(l['Quantity'] || '0');
     const cp = l['Call/Put'] || '';
+    const typ = l['Type'] || '';
+    if(typ === 'EQUITY') return 'Stock';
     if(qty < 0 && cp === 'Put')  return 'Naked Put';
     if(qty < 0 && cp === 'Call') return 'Naked Call';
     if(qty > 0 && cp === 'Call') return 'Long Call';
@@ -1411,6 +1450,31 @@ function buildDisplayItems(positionList) {
     }
   });
 
+  // Covered Call: EQUITY long + short call, 1 call per 100 shares
+  Object.entries(byUnderlying).forEach(([und, legs]) => {
+    const stockLegs = legs.filter(l => (l['Type']||'') === 'EQUITY' && !used.has(l));
+    const shortCalls = legs.filter(l => (l['Type']||'') !== 'EQUITY' && !used.has(l) &&
+      parseInt(l['Quantity']) < 0 && l['Call/Put'] === 'Call');
+    if(!stockLegs.length || !shortCalls.length) return;
+
+    stockLegs.forEach(stock => {
+      const shares = Math.abs(parseInt(stock['Quantity'] || '0'));
+      const contractsNeeded = Math.floor(shares / 100);
+      if(contractsNeeded === 0) return;
+      let contractsUsed = 0;
+      shortCalls.forEach(call => {
+        if(used.has(call)) return;
+        const callQty = Math.abs(parseInt(call['Quantity'] || '0'));
+        if(contractsUsed + callQty <= contractsNeeded) {
+          // Full coverage — group stock + call as Covered Call
+          items.push({ isSpread: true, legs: [stock, call], type: 'Covered Call', underlying: und });
+          used.add(stock); used.add(call);
+          contractsUsed += callQty;
+        }
+      });
+    });
+  });
+
   // All remaining single positions
   positionList.forEach(p => {
     if(!used.has(p)) {
@@ -1432,13 +1496,24 @@ function spreadAggregate(legs) {
   const avgPoP = (() => { const ps = legs.filter(l => cleanNum(l['Quantity'])<0 && cleanNum(l['PoP']) != null); return ps.length ? Math.round(ps.reduce((s,l) => s+(cleanNum(l['PoP'])||0),0)/ps.length) : null; })();
   const totalMark = legs.reduce((s, l) => s + (cleanNum(l['Mark'])||0)*(Math.abs(cleanNum(l['Quantity'])||0))*100, 0);
 
-  // PAE for spread: sum of ALL leg PAEs (short AND long)
-  // Long leg PAE = intrinsic at expiry - debit paid (correctly offsets the spread)
+  // PAE for spread: sum of ALL leg PAEs (short AND long + stock)
   let pae = null;
   legs.forEach(l => {
-    const d = deriveFields(l);
-    if(d.pae !== null) {
-      pae = (pae === null ? 0 : pae) + d.pae;
+    if((l['Type']||'') === 'EQUITY') {
+      // Stock leg PAE: (current_price - cost_per_share) * shares
+      const last = cleanNum(l['Underlying Last Price']) || cleanNum(l['Mark']);
+      const cost = cleanNum(l['Cost']); // total cost basis (negative = debit)
+      const qty = Math.abs(cleanNum(l['Quantity']) || 0);
+      if(last !== null && cost !== null && qty > 0) {
+        const costPerShare = Math.abs(cost) / qty;
+        const stockPAE = (last - costPerShare) * qty;
+        pae = (pae === null ? 0 : pae) + stockPAE;
+      }
+    } else {
+      const d = deriveFields(l);
+      if(d.pae !== null) {
+        pae = (pae === null ? 0 : pae) + d.pae;
+      }
     }
   });
   // PAE% uses net cost (totalCost = net credit for credit spreads, net debit for debit spreads)
@@ -1942,9 +2017,11 @@ function fmtWFCell(col, val, derived, pos){
   }
   if(col.fmt==='wf-symbol'){
     const isFut=String(val).startsWith('./');
+    const isStk=(pos&&(pos['Type']||'')==='EQUITY');
     const sym=val.split(' ')[0].replace('./','');
     const futTag=isFut?'<span style="font-size:9px;background:var(--pbg);color:var(--pt);padding:1px 4px;border-radius:6px;margin-left:3px;font-weight:500">FUT</span>':'';
-    return `<strong style="font-size:11px">${sym}</strong>${futTag}`;
+    const stkTag=isStk?'<span style="font-size:9px;background:#EDF2E0;color:#5A6A3A;padding:1px 4px;border-radius:6px;margin-left:3px;font-weight:500">STK</span>':'';
+    return `<strong style="font-size:11px">${sym}</strong>${futTag}${stkTag}`;
   }
   if(col.fmt==='wf-cp'){
     return val==='Put'?'<span class="badge br">P</span>':'<span class="badge bg">C</span>';
