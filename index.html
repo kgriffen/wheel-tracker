@@ -217,7 +217,6 @@ input[type=checkbox]{width:13px;height:13px;cursor:pointer;accent-color:var(--tx
     <button class="nbtn" onclick="showPage('settings',this)">Settings</button>
   </nav>
   <div class="tr">
-    <span id="sync-lbl" style="font-size:11px;color:var(--tx3)"></span>
     <span id="pos-date-lbl" style="font-size:11px;color:var(--tx3)"></span>
     <button class="btn btn-sm btn-p" onclick="openM('import-mo')">Import Positions</button>
   </div>
@@ -252,11 +251,6 @@ input[type=checkbox]{width:13px;height:13px;cursor:pointer;accent-color:var(--tx
       <div style="position:relative">
         <button class="btn btn-sm" id="col-panel-btn" onclick="toggleColPanel()">⊞ Columns</button>
         <div id="col-panel" style="display:none;position:absolute;right:0;top:calc(100% + 4px);background:var(--surf);border:1px solid var(--bdr2);border-radius:var(--rl);padding:12px;z-index:100;width:220px;box-shadow:0 4px 16px rgba(0,0,0,.1)">
-          <div style="font-size:10px;font-weight:500;color:var(--tx3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Column presets</div>
-          <div style="display:flex;gap:6px;margin-bottom:12px">
-            <button class="btn btn-sm" style="flex:1" onclick="applyPreset('essential')">Essentials</button>
-            <button class="btn btn-sm" style="flex:1" onclick="applyPreset('all')">All</button>
-          </div>
           <div style="font-size:10px;font-weight:500;color:var(--tx3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Drag to reorder</div>
           <div id="col-checklist" style="max-height:320px;overflow-y:auto"></div>
           <div style="margin-top:10px;border-top:1px solid var(--bdr);padding-top:8px">
@@ -307,18 +301,8 @@ input[type=checkbox]{width:13px;height:13px;cursor:pointer;accent-color:var(--tx
 <div class="page" id="page-settings">
   <div class="ph"><div class="pt">Settings</div></div>
   <div class="ss-section">
-    <div class="ss-title">GitHub storage</div>
-    <div class="ss-sub">All data saved to your repo — syncs across devices.</div>
-    <div class="fr"><label>GitHub username</label><input id="s-user" value="kgriffen"></div>
-    <div class="fr"><label>Repository name</label><input id="s-repo" value="wheel-tracker"></div>
-    <div class="fr"><label>Personal access token</label>
-      <div class="irow"><input id="s-token" type="password" placeholder="ghp_xxxxxxxxxxxx"><button class="btn" onclick="testGH()">Test</button></div>
-    </div>
-    <div id="gh-test" style="font-size:11px;margin-top:5px"></div>
-    <div style="display:flex;gap:7px;margin-top:11px">
-      <button class="btn btn-p" onclick="saveSettings()">Save</button>
-      <button class="btn" onclick="loadFromGH()">Sync now</button>
-    </div>
+    <div class="ss-title">Local storage</div>
+    <div class="ss-sub">All data is saved locally in your browser. Import positions from Tastytrade CSV to update.</div>
   </div>
   <div class="ss-section">
     <div class="ss-title">Data</div>
@@ -423,8 +407,6 @@ let colOrder = [];           // column display order (array of col keys)
 let colWidths = {};          // { colKey: widthPx }
 let colHidden = {};           // { colKey: true } = hidden
 let selectedIdx = new Set(); // selected row indices (into filtered list)
-let ghCfg = { user:'kgriffen', repo:'wheel-tracker', token:'' };
-let ghSha = null;
 let posImportDate = '';
 let sortState = { col:'', asc:true };
 let wfColOrder = [];    // workflow column order
@@ -507,12 +489,8 @@ const ALL_COLS = [
 // INIT
 // ═══════════════════════════════════════════════════════════
 window.addEventListener('DOMContentLoaded', () => {
-  try { const s=localStorage.getItem('wt_cfg'); if(s) ghCfg={...ghCfg,...JSON.parse(s)}; } catch(e){}
-  document.getElementById('s-user').value = ghCfg.user;
-  document.getElementById('s-repo').value = ghCfg.repo;
-  document.getElementById('s-token').value = ghCfg.token;
   initColOrder();
-  loadFromGH();
+  loadLocal();
 });
 
 function initColOrder() {
@@ -522,36 +500,6 @@ function initColOrder() {
 // ═══════════════════════════════════════════════════════════
 // GITHUB
 // ═══════════════════════════════════════════════════════════
-const GH_FILE='positions.json';
-const ghUrl=()=>`https://api.github.com/repos/${ghCfg.user}/${ghCfg.repo}/contents/${GH_FILE}`;
-const ghH=()=>({'Authorization':'token '+ghCfg.token,'Accept':'application/vnd.github.v3+json','Content-Type':'application/json'});
-
-async function loadFromGH(){
-  if(!ghCfg.token){loadLocal();return;}
-  showSync('syncing','Loading…');
-  try{
-    const r=await fetch(ghUrl(),{headers:ghH()});
-    if(r.status===404){loadLocal();showSync('ok','GitHub connected');return;}
-    if(!r.ok) throw new Error('HTTP '+r.status);
-    const d=await r.json();
-    ghSha=d.sha;
-    const p=JSON.parse(atob(d.content.replace(/\n/g,'')));
-    positions=p.positions||[];
-    buckets=p.buckets||DEFAULT_BUCKETS;
-    colWidths=p.colWidths||{};
-    colHidden=p.colHidden||{};
-    posImportDate=p.posImportDate||'';
-    wfColOrder=p.wfColOrder||[];
-    wfColWidths=p.wfColWidths||{};
-    wfColHidden=p.wfColHidden||{};
-    localStorage.setItem('wt_data',JSON.stringify({positions,buckets,colWidths,colHidden,posImportDate,wfColOrder,wfColWidths,wfColHidden}));
-    showSync('ok','Synced ✓');
-    sanitizeColState();
-    migrateBucketOrder();
-    renderAll();
-  }catch(e){loadLocal();showSync('err','GitHub error — using local');}
-}
-
 function loadLocal(){
   try{
     const d=JSON.parse(localStorage.getItem('wt_data')||'{}');
@@ -569,64 +517,12 @@ function loadLocal(){
   renderAll();
 }
 
-async function saveToGH(){
+function saveToLocal(){
   const data={positions,buckets,colWidths,colHidden,posImportDate,wfColOrder,wfColWidths,wfColHidden,updated:new Date().toISOString()};
   localStorage.setItem('wt_data',JSON.stringify(data));
-  if(!ghCfg.token)return;
-  showSync('syncing','Saving…');
-  try{
-    // Always fetch current SHA before saving to avoid 409 conflicts
-    const check=await fetch(ghUrl(),{headers:ghH()});
-    if(check.ok){ const cd=await check.json(); ghSha=cd.sha; }
-    else if(check.status===404){ ghSha=null; } // file doesn't exist yet
-    else throw new Error('SHA fetch failed: '+check.status);
-
-    const encoded=btoa(unescape(encodeURIComponent(JSON.stringify(data,null,2))));
-    const body={message:'Update positions '+today(),content:encoded};
-    if(ghSha)body.sha=ghSha;
-    const r=await fetch(ghUrl(),{method:'PUT',headers:ghH(),body:JSON.stringify(body)});
-    if(!r.ok){
-      const errText=await r.text().catch(()=>'');
-      throw new Error('HTTP '+r.status+' '+errText.slice(0,100));
-    }
-    const d=await r.json();
-    ghSha=d.content?.sha;
-    showSync('ok','Saved to GitHub ✓');
-  }catch(e){
-    showSync('err','GitHub save failed: '+e.message);
-    console.error('saveToGH error:',e);
-  }
 }
 
-async function testGH(){
-  const u=document.getElementById('s-user').value.trim();
-  const rp=document.getElementById('s-repo').value.trim();
-  const tk=document.getElementById('s-token').value.trim();
-  const el=document.getElementById('gh-test');
-  el.textContent='Testing…';el.style.color='var(--tx3)';
-  try{
-    const r=await fetch(`https://api.github.com/repos/${u}/${rp}`,{headers:{'Authorization':'token '+tk,'Accept':'application/vnd.github.v3+json'}});
-    el.textContent=r.ok?'✓ Connected':'✗ Failed ('+r.status+')';
-    el.style.color=r.ok?'var(--green)':'var(--red)';
-  }catch(e){el.textContent='✗ Network error';el.style.color='var(--red)';}
-}
 
-function saveSettings(){
-  ghCfg.user=document.getElementById('s-user').value.trim();
-  ghCfg.repo=document.getElementById('s-repo').value.trim();
-  ghCfg.token=document.getElementById('s-token').value.trim();
-  localStorage.setItem('wt_cfg',JSON.stringify(ghCfg));
-  loadFromGH();
-}
-
-function showSync(state,msg){
-  const bar=document.getElementById('syncbar'),dot=document.getElementById('sdot');
-  dot.className='sdot'+(state==='syncing'?' syncing':state==='err'?' err':'');
-  document.getElementById('smsg').textContent=msg;
-  document.getElementById('sync-lbl').textContent=state==='ok'?'GitHub ✓':state==='err'?'Local only':'';
-  bar.classList.add('show');
-  if(state!=='syncing')setTimeout(()=>bar.classList.remove('show'),3000);
-}
 
 // ═══════════════════════════════════════════════════════════
 // HELPERS
@@ -748,11 +644,9 @@ function handleImport(e){
     }
     positions=rows;
     posImportDate=new Date().toLocaleString();
-    localStorage.removeItem('wt_data'); // clear stale cache before saving fresh import
     document.getElementById('pos-date-lbl').textContent='Imported: '+today();
-    showImportResult('ok',`✓ Loaded ${positions.length} positions. Saving to GitHub…`);
-    ghSha=null;
-    await saveToGH();
+    showImportResult('ok',`✓ Loaded ${positions.length} positions. Saved locally.`);
+    saveToLocal();
     const syncLbl=document.getElementById('sync-lbl').textContent;
     if(syncLbl.includes('✓')){
       showImportResult('ok',`✓ Loaded ${positions.length} positions. Saved to GitHub.`);
@@ -1108,7 +1002,7 @@ function renderPosHeader(){
         handle.classList.remove('dragging');
         document.removeEventListener('mousemove',onMove);
         document.removeEventListener('mouseup',onUp);
-        saveToGH();
+        saveToLocal();
       };
       document.addEventListener('mousemove',onMove);
       document.addEventListener('mouseup',onUp);
@@ -1130,7 +1024,7 @@ function renderPosHeader(){
       colOrder.splice(fi,1);
       colOrder.splice(ti,0,fromKey);
       renderPositions();
-      saveToGH();
+      saveToLocal();
     });
     tr.appendChild(th);
   });
@@ -1256,7 +1150,7 @@ function toggleSpread(spreadId){
   if(toggle) toggle.textContent=expanded?'▶':'▼';
 }
 
-function resetColOrder(){colOrder=ALL_COLS.map(c=>c.key);colWidths={};colHidden={};closeColPanel();renderPositions();saveToGH();}
+function resetColOrder(){colOrder=ALL_COLS.map(c=>c.key);colWidths={};colHidden={};closeColPanel();renderPositions();saveToLocal();}
 
 // ═══════════════════════════════════════════════════════════
 // SELECTION
@@ -1304,7 +1198,7 @@ function deleteSelected(){
   const toRemove=new Set([...selectedIdx].map(ri=>list[ri]));
   positions=positions.filter(p=>!toRemove.has(p));
   selectedIdx.clear();
-  saveToGH();renderAll();
+  saveToLocal();renderAll();
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -1350,7 +1244,7 @@ function saveEdit(){
   p['P/L Opn%']=document.getElementById('e-plpct').value;
   p['PoP']=document.getElementById('e-pop').value;
   p['IV Rank']=document.getElementById('e-ivr').value;
-  saveToGH();closeM('edit-mo');renderAll();
+  saveToLocal();closeM('edit-mo');renderAll();
 }
 
 function deleteFromEdit(){
@@ -1359,7 +1253,7 @@ function deleteFromEdit(){
   const list=getFilteredPositions();
   const p=list[ri];
   positions=positions.filter(x=>x!==p);
-  saveToGH();closeM('edit-mo');renderAll();
+  saveToLocal();closeM('edit-mo');renderAll();
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -2085,7 +1979,7 @@ function wfColDrop(event, toKey, th){
   wfColOrder.splice(fi,1);
   wfColOrder.splice(ti,0,wfDragColKey);
   wfDragColKey=null;
-  saveToGH();
+  saveToLocal();
   renderWorkflow();
 }
 
@@ -2104,7 +1998,7 @@ function wfResizeStart(event, colKey, startW){
   const onUp=()=>{
     document.removeEventListener('mousemove',onMove);
     document.removeEventListener('mouseup',onUp);
-    saveToGH();
+    saveToLocal();
   };
   document.addEventListener('mousemove',onMove);
   document.addEventListener('mouseup',onUp);
@@ -2227,14 +2121,14 @@ function saveBucket(){
     buckets.push({id:'b-'+Date.now(),name,color,conditions});
   }
 
-  saveToGH();closeM('bucket-mo');renderWorkflow();
+  saveToLocal();closeM('bucket-mo');renderWorkflow();
 }
 
 function deleteBucket(){
   if(!editingBucketId)return;
   if(!confirm('Delete this bucket?'))return;
   buckets=buckets.filter(b=>b.id!==editingBucketId);
-  saveToGH();closeM('bucket-mo');renderWorkflow();
+  saveToLocal();closeM('bucket-mo');renderWorkflow();
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -2278,7 +2172,7 @@ function migrateBucketOrder(){
   if(alreadyOrdered && urgent?.conditions[0]?.value==='50') return;
   // Reorder to match new default order
   buckets = defaultIds.map(id=>buckets.find(b=>b.id===id)).filter(Boolean);
-  saveToGH();
+  saveToLocal();
 }
 
 function resetWFCols(){
@@ -2286,7 +2180,7 @@ function resetWFCols(){
   wfColWidths={};
   wfColHidden={};
   wfSortState={};
-  saveToGH();
+  saveToLocal();
   renderWorkflow();
 }
 
@@ -2295,8 +2189,6 @@ function resetWFCols(){
 function sanitizeColState(){
   // Add any new ALL_COLS keys not in colOrder
   ALL_COLS.forEach(c=>{ if(!colOrder.includes(c.key)) colOrder.push(c.key); });
-  // Un-hide any columns in ESSENTIAL_COLS that got stuck hidden
-  ESSENTIAL_COLS.forEach(k=>{ delete colHidden[k]; });
   // Add any new WF_COLS keys not in wfColOrder
   if(!wfColOrder.length) wfColOrder=WF_COLS.map(c=>c.key);
   else { WF_COLS.forEach(c=>{ if(!wfColOrder.includes(c.key)) wfColOrder.push(c.key); }); }
@@ -2309,21 +2201,17 @@ function exportJSON(){
   const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='wheel-tracker-'+today()+'.json';a.click();
 }
 
-async function clearAll(){
-  if(!confirm('Delete ALL data? This will also clear positions.json in GitHub.'))return;
+function clearAll(){
+  if(!confirm('Delete ALL data?'))return;
   positions=[];buckets=DEFAULT_BUCKETS;colWidths={};colHidden={};
   posImportDate='';wfColOrder=[];wfColWidths={};wfColHidden={};wfSortState={};
-  // Don't null ghSha before saving — we need it to update the GitHub file
-  await saveToGH();
-  ghSha=null; // clear after successful save
+  saveToLocal();
   renderAll();
 }
 
 // ═══════════════════════════════════════════════════════════
 // COLUMN PANEL
 // ═══════════════════════════════════════════════════════════
-const ESSENTIAL_COLS = ['_cb','Symbol','_bucket','_type','Call/Put','Quantity','Strike Price','Exp Date','DTE',"D's Opn",'Trade Price','Mark','P/L Open','P/L Opn%','_pae','_pae_pct','PoP','β Delta','/ Delta','Underlying Last Price','_actions'];
-
 function toggleColPanel(){
   const panel = document.getElementById('col-panel');
   const isOpen = panel.style.display !== 'none';
@@ -2373,23 +2261,10 @@ function toggleColVisibility(key, visible){
   if(visible) delete colHidden[key];
   else colHidden[key] = true;
   renderPositions();
-  saveToGH();
+  saveToLocal();
 }
 
-function applyPreset(preset){
-  if(preset==='essential'){
-    // Hide all non-essential
-    ALL_COLS.forEach(c=>{
-      if(!c.fixed && !ESSENTIAL_COLS.includes(c.key)) colHidden[c.key]=true;
-      else delete colHidden[c.key];
-    });
-  } else {
-    colHidden={};
-  }
-  renderColChecklist();
-  renderPositions();
-  saveToGH();
-}
+
 
 // Drag to reorder within the column checklist
 let colDragKey = null;
@@ -2416,7 +2291,7 @@ function colDrop(e, el){
   colDragKey=null;
   renderColChecklist();
   renderPositions();
-  saveToGH();
+  saveToLocal();
 }
 // reset opacity on dragend
 document.addEventListener('dragend', e=>{
@@ -2457,7 +2332,7 @@ function bucketDrop(e, el){
   const [moved] = buckets.splice(fi,1);
   buckets.splice(ti,0,moved);
   bucketDraggingId = null;
-  saveToGH();
+  saveToLocal();
   renderWorkflow();
 }
 
