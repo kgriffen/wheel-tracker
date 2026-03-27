@@ -212,8 +212,8 @@ input[type=checkbox]{width:13px;height:13px;cursor:pointer;accent-color:var(--tx
     Wheel Tracker
   </div>
   <nav>
-    <button class="nbtn active" onclick="showPage('positions',this)">Positions</button>
-    <button class="nbtn" onclick="showPage('workflow',this)">Workflow</button>
+    <button class="nbtn active" onclick="showPage('workflow',this)">Workflow</button>
+    <button class="nbtn" onclick="showPage('positions',this)">Positions</button>
     <button class="nbtn" onclick="showPage('settings',this)">Settings</button>
   </nav>
   <div class="tr">
@@ -224,7 +224,7 @@ input[type=checkbox]{width:13px;height:13px;cursor:pointer;accent-color:var(--tx
 </div>
 
 <!-- ═══ POSITIONS ═══ -->
-<div class="page active" id="page-positions">
+<div class="page" id="page-positions">
   <div class="ph">
     <div class="pt">Positions</div>
     <div class="ps" id="pos-count-lbl"></div>
@@ -285,7 +285,7 @@ input[type=checkbox]{width:13px;height:13px;cursor:pointer;accent-color:var(--tx
 </div>
 
 <!-- ═══ WORKFLOW ═══ -->
-<div class="page" id="page-workflow">
+<div class="page active" id="page-workflow">
   <div class="ph">
     <div class="pt">Workflow</div>
     <div class="ps">Positions organized by your custom action buckets</div>
@@ -1807,6 +1807,9 @@ function renderWFStats(list){
   const itm=open.filter(p=>deriveFields(p).itmOtm==='ITM').length;
   const avgPop=open.filter(p=>cleanNum(p['PoP'])!=null).length
     ?Math.round(open.filter(p=>cleanNum(p['PoP'])!=null).reduce((s,p)=>s+(cleanNum(p['PoP'])||0),0)/open.filter(p=>cleanNum(p['PoP'])!=null).length):null;
+  const avgDTE=open.length?Math.round(open.reduce((s,p)=>s+(parseDays(p['DTE'])||0),0)/open.length):null;
+  const totalPAE=open.reduce((s,p)=>{const d=deriveFields(p);return s+(d.pae!==null?d.pae:0);},0);
+  const hasPAE=open.some(p=>deriveFields(p).pae!==null);
 
   // Per-bucket counts — use SAME item-based logic as renderWorkflow
   // buildDisplayItems groups spread legs into single items so counts match
@@ -1836,7 +1839,9 @@ function renderWFStats(list){
   document.getElementById('wf-stats').innerHTML=`
     <div class="stat"><div class="sl">Total</div><div class="sv">${statsItems.length}</div><div class="ss">${open.length} short</div></div>
     <div class="stat"><div class="sl">P/L Open</div><div class="sv ${totalPL>=0?'cg':'cr'}" style="font-size:16px">${fmt$(totalPL,true)}</div></div>
+    <div class="stat"><div class="sl">Avg DTE</div><div class="sv">${avgDTE!==null?avgDTE+'d':'—'}</div></div>
     <div class="stat"><div class="sl">Avg PoP</div><div class="sv ${avgPop>=65?'cg':avgPop>=50?'ca':'cr'}">${avgPop!==null?avgPop+'%':'—'}</div></div>
+    ${hasPAE?`<div class="stat"><div class="sl">PAE $</div><div class="sv ${totalPAE>=0?'cg':'cr'}">${totalPAE>=0?'+$':'-$'}${Math.abs(totalPAE).toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:0})}</div></div>`:''}
     <div class="stat"><div class="sl">ITM</div><div class="sv ${itm>0?'cr':'cg'}">${itm}</div><div class="ss">of ${list.length}</div></div>
     ${bucketWidgets}
     ${uncatCount>0?`<div class="stat"><div class="sl" style="display:flex;align-items:center;gap:4px"><span style="width:7px;height:7px;border-radius:50%;background:#888780;display:inline-block"></span>Uncategorized</div><div class="sv" style="font-size:18px">${uncatCount}</div></div>`:''}
