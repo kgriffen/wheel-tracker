@@ -598,25 +598,41 @@ function deriveFields(p){
   // Short: PAE = credit received - intrinsic loss at expiry
   // Long:  PAE = intrinsic value at expiry - debit paid
   let pae=null, paePct=null;
-  if((p['Type']||'')!=='FUTURES_OPTION' && qty!==null && strike!==null && last!==null && last>0 && cost!==null){
+  const _isFuturesForPAE = (p['Type']||'') === 'FUTURES_OPTION';
+  if(qty!==null && strike!==null && last!==null && last>0 && cost!==null){
     const cp2=p['Call/Put']||'';
     const intrinsic=cp2==='Put'?Math.max(0,strike-last):Math.max(0,last-strike);
-    if(qty<0 && cost>0){
-      // Short: credit collected minus intrinsic loss
-      pae=Math.round((cost-(intrinsic*Math.abs(qty)*100))*100)/100;
-      paePct=Math.round((pae/cost)*1000)/10;
-    } else if(qty>0){
-      // Long: intrinsic value received minus debit paid
-      const absCost=Math.abs(cost);
-      pae=Math.round(((intrinsic*Math.abs(qty)*100)-absCost)*100)/100;
-      paePct=absCost>0?Math.round((pae/absCost)*1000)/10:null;
+    if(_isFuturesForPAE){
+      // Futures: use multiplier derived from symbol; cost already reflects full dollar value
+      const mult = getFuturesMultiplier(p['Symbol']);
+      if(mult !== null){
+        if(qty<0 && cost>0){
+          pae=Math.round((cost-(intrinsic*Math.abs(qty)*mult))*100)/100;
+          paePct=Math.round((pae/cost)*1000)/10;
+        } else if(qty>0){
+          const absCost=Math.abs(cost);
+          pae=Math.round(((intrinsic*Math.abs(qty)*mult)-absCost)*100)/100;
+          paePct=absCost>0?Math.round((pae/absCost)*1000)/10:null;
+        }
+      }
+    } else {
+      if(qty<0 && cost>0){
+        // Short equity: credit collected minus intrinsic loss
+        pae=Math.round((cost-(intrinsic*Math.abs(qty)*100))*100)/100;
+        paePct=Math.round((pae/cost)*1000)/10;
+      } else if(qty>0){
+        // Long equity: intrinsic value received minus debit paid
+        const absCost=Math.abs(cost);
+        pae=Math.round(((intrinsic*Math.abs(qty)*100)-absCost)*100)/100;
+        paePct=absCost>0?Math.round((pae/absCost)*1000)/10:null;
+      }
     }
   }
 
   // Ann Yield: (Cost / Capital) * (365 / (DTE + DaysOpn)) * 100
   // Exclude futures — their strike values are FX rates/index points not dollar strikes
   let _annYield = null;
-  const _isFutures = (p['Type']||'') === 'FUTURES_OPTION';
+  const _isFutures = _isFuturesForPAE;
   if(!_isFutures && cost && cost > 0 && dte !== null && daysOpn !== null && (dte + daysOpn) > 0 && strike && qty) {
     const capital = Math.abs(strike) * 100 * Math.abs(qty);
     if(capital > 0) _annYield = Math.round((cost / capital) * (365 / (dte + daysOpn)) * 100 * 10) / 10;
@@ -1343,6 +1359,31 @@ function getUnderlying(sym) {
   return m ? m[1] : sym.trim();
 }
 
+function getFuturesMultiplier(sym) {
+  if(!sym) return null;
+  // Strip leading ./ and contract suffix (e.g. ./ESH6 → ES)
+  const root = sym.startsWith('./')
+    ? sym.split(' ')[0].replace('./','').replace(/[A-Z]\d+$/,'')
+    : sym.replace(/[A-Z]\d+$/,'');
+  const MULTIPLIERS = {
+    'ES':1000,'MES':5,       // /MES micro S&P, /ES e-mini S&P — note: ES notional is 50*price but premium multiplier is 50
+    'NQ':20,'MNQ':2,
+    'RTY':50,'M2K':5,
+    'YM':5,'MYM':0.5,
+    'CL':1000,'MCL':100,
+    'GC':100,'MGC':10,
+    'SI':5000,'SIL':1000,
+    'HG':25000,
+    'NG':10000,
+    'ZB':1000,'ZN':1000,'ZF':1000,'ZT':2000,
+    'ZC':50,'ZS':50,'ZW':50,
+    '6E':125000,'6J':12500000,'6B':62500,'6C':100000,'6A':100000,'6S':125000,'6N':100000,
+    'VX':1000,
+    'BTC':5,'MBT':0.1,'ETH':50,'MET':0.1,
+  };
+  return MULTIPLIERS[root] || null;
+}
+
 function classifyLegs(legs) {
   if(!legs || !legs.length) return 'Unknown';
   if(legs.length === 1) {
@@ -1847,6 +1888,38 @@ const WF_COLS = [
   {key:'Sector',            label:'Sector',     width:100, sortable:true,  fmt:'text'},
 ];
 
+// Sort value for a display item — handles spreads via aggregates, singles via wfSortVal
+function wfSortValItem(item, colKey) {
+  if(!item.isSpread) return wfSortVal(item.position, colKey);
+  const agg = spreadAggregate(item.legs);
+  switch(colKey) {
+    case '_pae':       return agg.pae;
+    case '_pae_pct':   return agg.paePct;
+    case 'P/L Open':   return agg.totalPLOpen;
+    case 'P/L Opn%':   return agg.plPct;
+    case 'P/L Day':    return agg.totalPLDay;
+    case 'Cost':       return agg.totalCost;
+    case 'PoP':        return agg.avgPoP;
+    case 'DTE':        return agg.minDTE < 999 ? agg.minDTE : null;
+    case 'Exp Date':   return agg.sharedExp || null;
+    case '/ Delta':    return agg.totalDelta;
+    case 'Theta':      return agg.totalTheta;
+    case 'Underlying Last Price': return agg.lastPrice;
+    case 'Symbol':     return item.underlying.toLowerCase();
+    case '_type':      return item.type.toLowerCase();
+    case '_bucket': {
+      const b = getBucketForItem(item);
+      if(!b) return 'zzz';
+      return String(buckets.findIndex(x=>x.id===b.id)).padStart(3,'0');
+    }
+    default: {
+      // For per-leg fields, prefer the short leg
+      const shortLeg = item.legs.find(l => cleanNum(l['Quantity']) < 0) || item.legs[0];
+      return wfSortVal(shortLeg, colKey);
+    }
+  }
+}
+
 function wfSortVal(p, colKey){
   if(colKey==='_pae'||colKey==='_pae_pct'||colKey==='_ann_yield'||colKey==='_capital'||colKey==='_type'){
     const d=deriveFields(p);
@@ -1879,11 +1952,8 @@ function renderWFTable(itemsOrLegs, bucketId, currentBucket){
     : buildDisplayItems(itemsOrLegs);
 
   const ss=wfSortState[bucketId]||{col:'',asc:true};
-  // Sort by first leg's sort value for now
   const sortedItems=ss.col?[...items].sort((a,b)=>{
-    const pa=a.isSpread?a.legs[0]:a.position;
-    const pb=b.isSpread?b.legs[0]:b.position;
-    const av=wfSortVal(pa,ss.col), bv=wfSortVal(pb,ss.col);
+    const av=wfSortValItem(a,ss.col), bv=wfSortValItem(b,ss.col);
     if(av===null) return 1; if(bv===null) return -1;
     return (av<bv?-1:av>bv?1:0)*(ss.asc?1:-1);
   }):[...items];
