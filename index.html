@@ -1837,6 +1837,60 @@ function renderWFStats(list){
   });
   const uncatCount=statsItems.filter(item=>!statsMatched.has(item)).length;
 
+  // ── Beta-Weighted Delta ──────────────────────────────────────
+  // Spreads: sum β Delta across all legs; singles: use β Delta directly
+  const totalBwDelta = statsItems.reduce((s, item) => {
+    if(item.isSpread) {
+      return s + item.legs.reduce((ls, l) => ls + (cleanNum(l['β Delta']) || 0), 0);
+    } else {
+      return s + (cleanNum(item.position['β Delta']) || 0);
+    }
+  }, 0);
+  const absBwD = Math.abs(totalBwDelta);
+  const bwDeltaCls = absBwD <= 500 ? 'cg' : absBwD <= 1000 ? 'ca' : 'cr';
+
+  // ── Theta ────────────────────────────────────────────────────
+  // Spreads: sum Theta across all legs; singles: use Theta directly
+  const totalTheta = statsItems.reduce((s, item) => {
+    if(item.isSpread) {
+      return s + item.legs.reduce((ls, l) => ls + (cleanNum(l['Theta']) || 0), 0);
+    } else {
+      return s + (cleanNum(item.position['Theta']) || 0);
+    }
+  }, 0);
+  // Notional for theta % — mirrors positions-page logic (spread-aware, excludes futures & index)
+  const isFutLeg = leg => (leg['Type']||'') === 'FUTURES_OPTION';
+  const wfNotional = statsItems.reduce((s, item) => {
+    if(item.isSpread) {
+      const shortLegs = item.legs.filter(l => cleanNum(l['Quantity']) < 0);
+      const longLegs  = item.legs.filter(l => cleanNum(l['Quantity']) > 0);
+      let sn = 0;
+      shortLegs.forEach(sl => {
+        if(isFutLeg(sl)) return;
+        const matchingLong = longLegs.find(ll => ll['Call/Put'] === sl['Call/Put']);
+        if(matchingLong) {
+          const width = Math.abs(cleanNum(sl['Strike Price']) - cleanNum(matchingLong['Strike Price']));
+          sn += width * 100 * Math.abs(cleanNum(sl['Quantity']));
+        } else {
+          sn += Math.abs(cleanNum(sl['Strike Price'])) * 100 * Math.abs(cleanNum(sl['Quantity']));
+        }
+      });
+      return s + sn;
+    } else {
+      const p = item.position;
+      if(isFutLeg(p)) return s;
+      const d = deriveFields(p);
+      return s + (cleanNum(p['Quantity']) < 0 ? (d._capital || 0) : 0);
+    }
+  }, 0);
+  // Theta % of notional (daily theta / notional, expressed as %)
+  const thetaPct = wfNotional > 0 ? Math.abs(totalTheta) / wfNotional * 100 : null;
+  const thetaCls = thetaPct === null ? 'cb'
+    : thetaPct < 0.10 ? 'cb'
+    : thetaPct < 0.30 ? 'cg'
+    : thetaPct < 0.40 ? 'ca'
+    : 'cr';
+
   const bucketWidgets=buckets.map(b=>`
     <div class="stat" style="cursor:pointer" onclick="document.querySelector('[data-bucket-id=\'${b.id}\']')?.scrollIntoView({behavior:'smooth',block:'nearest'})">
       <div class="sl" style="display:flex;align-items:center;gap:4px">
@@ -1853,6 +1907,16 @@ function renderWFStats(list){
     <div class="stat"><div class="sl">Avg PoP</div><div class="sv ${avgPop>=65?'cg':avgPop>=50?'ca':'cr'}">${avgPop!==null?avgPop+'%':'—'}</div></div>
     ${hasPAE?`<div class="stat"><div class="sl">PAE $</div><div class="sv ${totalPAE>=0?'cg':'cr'}">${totalPAE>=0?'+$':'-$'}${Math.abs(totalPAE).toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:0})}</div></div>`:''}
     <div class="stat"><div class="sl">ITM</div><div class="sv ${itm>0?'cr':'cg'}">${itm}</div><div class="ss">of ${list.length}</div></div>
+    <div class="stat">
+      <div class="sl">β Δ (BW Delta)</div>
+      <div class="sv ${bwDeltaCls}" style="font-size:16px">${totalBwDelta>=0?'+':''}${totalBwDelta.toFixed(1)}</div>
+      <div class="ss">beta-weighted</div>
+    </div>
+    <div class="stat">
+      <div class="sl">θ (Theta)</div>
+      <div class="sv ${thetaCls}" style="font-size:16px">${totalTheta>=0?'+':''}${totalTheta.toFixed(2)}</div>
+      <div class="ss">${thetaPct!==null?thetaPct.toFixed(3)+'% of notional':'no notional data'}</div>
+    </div>
     ${bucketWidgets}
     ${uncatCount>0?`<div class="stat"><div class="sl" style="display:flex;align-items:center;gap:4px"><span style="width:7px;height:7px;border-radius:50%;background:#888780;display:inline-block"></span>Uncategorized</div><div class="sv" style="font-size:18px">${uncatCount}</div></div>`:''}
   `;
