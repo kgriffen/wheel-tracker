@@ -450,6 +450,7 @@ const ALL_COLS = [
   {key:'Symbol',    label:'Symbol',    width:160, sortable:true,  fmt:'symbol'},
   {key:'_bucket',   label:'Bucket',    width:110, sortable:true,  fmt:'bucket'},
   {key:'_type',     label:'Type',      width:145, sortable:true,  fmt:'strategy-tag'},
+  {key:'_itmotm',   label:'Status',    width:58,  sortable:true,  fmt:'itmotm'},
   {key:'Type',      label:'Type',      width:80,  sortable:true,  fmt:'type-badge'},
   {key:'Call/Put',  label:'C/P',       width:44,  sortable:true,  fmt:'cp-badge'},
   {key:'Quantity',  label:'Qty',       width:44,  sortable:true,  fmt:'qty'},
@@ -477,9 +478,7 @@ const ALL_COLS = [
   {key:'Vega',      label:'Vega',      width:58,  sortable:true,  fmt:'num2'},
   {key:'Gamma',     label:'Gamma',     width:58,  sortable:true,  fmt:'num3'},
   {key:'Beta',      label:'Beta',      width:50,  sortable:true,  fmt:'num2'},
-  {key:'P/L YTD',   label:'YTD P/L',   width:65,  sortable:true,  fmt:'pl-money'},
   {key:'IV Idx 5d Chg', label:'IV 5d',  width:55, sortable:true,  fmt:'pct-chg'},
-  {key:'Ext RoR %', label:'Ext RoR',   width:58,  sortable:true,  fmt:'pct'},
   {key:'Sector',    label:'Sector',    width:110, sortable:true,  fmt:'text'},
   {key:'Industry',  label:'Industry',  width:140, sortable:true,  fmt:'text'},
   {key:'_actions',  label:'',          width:56,  sortable:false, fixed:true},
@@ -818,6 +817,10 @@ function fmtCell(col,val,derived,pos){
       // Also handle when called directly with a type string (WF table)
       return strategyTag(String(val));
     }
+    case 'itmotm':{
+      const status = val==='__itmotm__' ? (derived?.itmOtm||null) : (val||null);
+      return itmOtmBadge(status);
+    }
     case 'ann-yield':{
       if(val==='__ann_yield__'){
         const n=derived?._annYield;
@@ -865,7 +868,7 @@ function getFilteredPositions(){
   const cpf=document.getElementById('pos-cp')?.value||'';
   const itmf=document.getElementById('pos-itm')?.value||'';
 
-  let list=positions.filter(p=>{
+  const list=positions.filter(p=>{
     if(tf&&p['Type']!==tf)return false;
     if(cpf&&p['Call/Put']!==cpf)return false;
     if(q&&!JSON.stringify(p).toLowerCase().includes(q))return false;
@@ -873,29 +876,23 @@ function getFilteredPositions(){
     return true;
   });
 
-  if(sortState.col){
-    list=[...list].sort((a,b)=>{
-      const av=sortVal(a,sortState.col);
-      const bv=sortVal(b,sortState.col);
-      if(av===null)return 1;if(bv===null)return -1;
-      return (av<bv?-1:av>bv?1:0)*(sortState.asc?1:-1);
-    });
-  }
   return list;
 }
 
+// Sort value for a single position (used by posSortValItem)
 function sortVal(p,colKey){
-  if(colKey==='_pae'||colKey==='_pae_pct'||colKey==='_ann_yield'||colKey==='_capital'||colKey==='_type'){
+  if(colKey==='_pae'||colKey==='_pae_pct'||colKey==='_ann_yield'||colKey==='_capital'||colKey==='_type'||colKey==='_itmotm'){
     const d=deriveFields(p);
     if(colKey==='_pae') return d.pae;
     if(colKey==='_pae_pct') return d.paePct;
     if(colKey==='_ann_yield') return d._annYield;
     if(colKey==='_capital') return d._capital;
     if(colKey==='_type') return d._stratType||'';
+    if(colKey==='_itmotm') return d.itmOtm||'';
   }
   if(colKey==='_bucket'){
     const b=getBucketForPosition(p);
-    if(!b) return 'zzz'; // uncategorized sorts last
+    if(!b) return 'zzz';
     return String(buckets.findIndex(x=>x.id===b.id)).padStart(3,'0');
   }
   const col=ALL_COLS.find(c=>c.key===colKey);
@@ -905,6 +902,43 @@ function sortVal(p,colKey){
   if(['money','pl-money','pl-pct','pop','num1','num2','num3','pct','pct-chg','price2','price4','qty'].includes(col.fmt))return cleanNum(val);
   if(col.fmt==='symbol')return String(val||'').toLowerCase();
   return String(val||'').toLowerCase();
+}
+
+// Sort value for a display item — mirrors wfSortValItem but uses ALL_COLS/sortVal
+function posSortValItem(item, colKey) {
+  if(!item.isSpread) return sortVal(item.position, colKey);
+  const agg = spreadAggregate(item.legs);
+  switch(colKey) {
+    case '_pae':       return agg.pae;
+    case '_pae_pct':   return agg.paePct;
+    case 'P/L Open':   return agg.totalPLOpen;
+    case 'P/L Opn%':   return agg.plPct;
+    case 'P/L Day':    return agg.totalPLDay;
+    case 'Cost':       return agg.totalCost;
+    case 'PoP':        return agg.avgPoP;
+    case 'DTE':        return agg.minDTE < 999 ? agg.minDTE : null;
+    case 'Exp Date':   return agg.sharedExp || null;
+    case '/ Delta':    return agg.totalDelta;
+    case 'Theta':      return agg.totalTheta;
+    case 'Underlying Last Price': return agg.lastPrice;
+    case 'Symbol':     return item.underlying.toLowerCase();
+    case '_type':      return item.type.toLowerCase();
+    case '_itmotm': {
+      const statuses = item.legs.map(l => deriveFields(l).itmOtm);
+      if(statuses.includes('ITM')) return 'ITM';
+      if(statuses.includes('ATM')) return 'ATM';
+      return 'OTM';
+    }
+    case '_bucket': {
+      const b = getBucketForItem(item);
+      if(!b) return 'zzz';
+      return String(buckets.findIndex(x=>x.id===b.id)).padStart(3,'0');
+    }
+    default: {
+      const shortLeg = item.legs.find(l => cleanNum(l['Quantity']) < 0) || item.legs[0];
+      return sortVal(shortLeg, colKey);
+    }
+  }
 }
 
 function renderPositions(){
@@ -929,7 +963,15 @@ function renderPositions(){
 function renderPosStats(list){
   const all=list.length?list:positions;
   const shorts=all.filter(p=>cleanNum(p['Quantity'])<0);
-  const totalCost=shorts.reduce((s,p)=>s+(cleanNum(p['Cost'])||0),0);
+  // Total premium — spread-aware: use net cost per spread (all legs), single short legs only
+  const totalCost = buildDisplayItems(all).reduce((s, item) => {
+    if(item.isSpread) {
+      return s + item.legs.reduce((ls, l) => ls + (cleanNum(l['Cost']) || 0), 0);
+    } else {
+      const p = item.position;
+      return s + (cleanNum(p['Quantity']) < 0 ? (cleanNum(p['Cost']) || 0) : 0);
+    }
+  }, 0);
   const totalPL=all.reduce((s,p)=>s+(cleanNum(p['P/L Open'])||0),0);
   // Notional exposure — spread-aware:
   // Spreads: width × 100 × qty (max loss, long leg caps risk)
@@ -1066,7 +1108,13 @@ function renderPosHeader(){
 function renderPosBody(list){
   const tbody=document.getElementById('pos-tbody');
   const cols=colOrder.map(k=>ALL_COLS.find(c=>c.key===k)).filter(Boolean).filter(c=>c.fixed||!colHidden[c.key]);
-  const items=buildDisplayItems(list);
+  const rawItems=buildDisplayItems(list);
+  const items=sortState.col?[...rawItems].sort((a,b)=>{
+    const av=posSortValItem(a,sortState.col);
+    const bv=posSortValItem(b,sortState.col);
+    if(av===null)return 1;if(bv===null)return -1;
+    return (av<bv?-1:av>bv?1:0)*(sortState.asc?1:-1);
+  }):rawItems;
   const rows=[];
 
   items.forEach((item, itemIdx) => {
@@ -1082,7 +1130,7 @@ function renderPosBody(list){
         const style=`width:${w}px;min-width:${w}px;max-width:${w}px`;
         if(col.key==='_cb') return `<td class="cb-col" data-col="_cb" style="${style}"><input type="checkbox" class="row-cb" data-ri="${ri}" ${sel?'checked':''} onchange="onRowCheck(this)"></td>`;
         if(col.key==='_actions') return `<td data-col="_actions" style="${style};text-align:center"><button class="btn btn-sm" style="padding:2px 7px;font-size:11px" onclick="openEdit(${ri})">Edit</button></td>`;
-        const val=col.key==='_bucket'?'__bucket__':col.key==='_type'?'__type__':col.key==='_pae'?'__pae__':col.key==='_pae_pct'?'__pae_pct__':col.key==='_ann_yield'?'__ann_yield__':col.key==='_capital'?'__capital__':p[col.key];
+        const val=col.key==='_bucket'?'__bucket__':col.key==='_type'?'__type__':col.key==='_itmotm'?'__itmotm__':col.key==='_pae'?'__pae__':col.key==='_pae_pct'?'__pae_pct__':col.key==='_ann_yield'?'__ann_yield__':col.key==='_capital'?'__capital__':p[col.key];
         // Override bucket rendering with item's bucket
         if(col.key==='_bucket') return `<td data-col="${col.key}" style="${style}">${bucketTag(bucket)}</td>`;
         const html=fmtCell(col,val,derived,p);
@@ -1150,8 +1198,20 @@ function renderPosBody(list){
           const n=agg.totalTheta;
           return `<td style="${style};text-align:right"><span class="mono">${n.toFixed(2)}</span></td>`;
         }
+        // IV Rank: show short leg value for spreads
+        if(col.key==='IV Rank'){
+          const shortLeg=item.legs.find(l=>cleanNum(l['Quantity'])<0)||item.legs[0];
+          const ivr=cleanNum(shortLeg['IV Rank']);
+          return `<td style="${style};text-align:right">${ivr!==null?`<span class="mono">${ivr.toFixed(1)}</span>`:'—'}</td>`;
+        }
+        // ITM/OTM/ATM: any leg ITM → ITM, any ATM → ATM, else OTM
+        if(col.key==='_itmotm'){
+          const statuses=item.legs.map(l=>deriveFields(l).itmOtm);
+          const status=statuses.includes('ITM')?'ITM':statuses.includes('ATM')?'ATM':'OTM';
+          return `<td style="${style};text-align:center">${itmOtmBadge(status)}</td>`;
+        }
         // Blank for blended columns (Trade Price, Mark, β Delta, etc.)
-        const blankCols=new Set(['Trade Price','Mark','β Delta','IV Rank','Vega','Gamma','Beta','Ext RoR %','Ext']);
+        const blankCols=new Set(['Trade Price','Mark','β Delta','Vega','Gamma','Beta','Ext']);
         if(blankCols.has(col.key)) return `<td style="${style}"></td>`;
         return `<td style="${style}"></td>`;
       }).join('');
@@ -1172,7 +1232,7 @@ function renderPosBody(list){
           if(col.key==='_type') return `<td style="${style}"></td>`;
           // Stock leg: show cost basis in Strike, blank options cols
           if((p['Type']||'')==='EQUITY') {
-            const optionOnlyCols = new Set(['Call/Put','DTE',"D's Opn",'Trade Price','PoP','IV Rank','Theta','β Delta','/ Delta','Vega','Gamma','Beta','Exp Date','Ext RoR %','Ext']);
+            const optionOnlyCols = new Set(['Call/Put','DTE',"D's Opn",'Trade Price','PoP','IV Rank','Theta','β Delta','/ Delta','Vega','Gamma','Beta','Exp Date','Ext']);
             if(optionOnlyCols.has(col.key)) return `<td style="${style}"><span style="color:var(--tx3)">—</span></td>`;
             if(col.key==='Strike Price') {
               const cost=cleanNum(p['Cost']),qty=Math.abs(cleanNum(p['Quantity'])||1);
@@ -1633,6 +1693,17 @@ function strategyTag(type) {
   return `<span style="font-size:9.5px;padding:2px 6px;border-radius:6px;font-weight:500;white-space:nowrap;background:${s.bg};color:${s.color};border:1px solid ${s.color}22">${type}</span>`;
 }
 
+function itmOtmBadge(status) {
+  if(!status) return '<span style="color:var(--tx3)">—</span>';
+  const styles = {
+    'ITM': {bg:'var(--rbg)', color:'var(--red)'},
+    'ATM': {bg:'var(--abg)', color:'var(--amber)'},
+    'OTM': {bg:'var(--gbg)', color:'var(--green)'},
+  };
+  const s = styles[status] || {bg:'var(--surf2)', color:'var(--tx3)'};
+  return `<span style="font-size:9.5px;padding:2px 6px;border-radius:6px;font-weight:600;white-space:nowrap;background:${s.bg};color:${s.color}">${status}</span>`;
+}
+
 function bucketTag(bucket) {
   if(!bucket) return '<span style="color:var(--tx3)">—</span>';
   return `<span style="font-size:10px;padding:2px 7px;border-radius:8px;font-weight:500;white-space:nowrap;background:${hexToRgba(bucket.color,0.13)};color:${bucket.color};border:1px solid ${hexToRgba(bucket.color,0.28)}">${bucket.name}</span>`;
@@ -1909,12 +1980,12 @@ function renderWFStats(list){
     <div class="stat"><div class="sl">ITM</div><div class="sv ${itm>0?'cr':'cg'}">${itm}</div><div class="ss">of ${list.length}</div></div>
     <div class="stat">
       <div class="sl">β Δ (BW Delta)</div>
-      <div class="sv ${bwDeltaCls}" style="font-size:16px">${totalBwDelta>=0?'+':''}${totalBwDelta.toFixed(1)}</div>
+      <div class="sv ${bwDeltaCls}" style="font-size:16px">${totalBwDelta>=0?'+':''}${Math.round(totalBwDelta)}</div>
       <div class="ss">beta-weighted</div>
     </div>
     <div class="stat">
       <div class="sl">θ (Theta)</div>
-      <div class="sv ${thetaCls}" style="font-size:16px">${totalTheta>=0?'+':''}${totalTheta.toFixed(2)}</div>
+      <div class="sv ${thetaCls}" style="font-size:16px">${totalTheta>=0?'+':''}${Math.round(totalTheta)}</div>
       <div class="ss">${thetaPct!==null?thetaPct.toFixed(3)+'% of notional':'no notional data'}</div>
     </div>
     ${bucketWidgets}
@@ -1929,6 +2000,7 @@ const WF_COLS = [
   {key:'Symbol',            label:'Symbol',     width:130, sortable:true,  fmt:'wf-symbol'},
   {key:'_bucket',           label:'Bucket',     width:110, sortable:true,  fmt:'wf-bucket'},
   {key:'_type',             label:'Type',       width:145, sortable:true,  fmt:'strategy-tag'},
+  {key:'_itmotm',           label:'Status',     width:58,  sortable:true,  fmt:'itmotm'},
   {key:'Call/Put',          label:'C/P',        width:40,  sortable:true,  fmt:'wf-cp'},
   {key:'Strike Price',      label:'Strike',     width:72,  sortable:true,  fmt:'price4'},
   {key:'Quantity',          label:'Qty',        width:40,  sortable:true,  fmt:'qty'},
@@ -1971,6 +2043,12 @@ function wfSortValItem(item, colKey) {
     case 'Underlying Last Price': return agg.lastPrice;
     case 'Symbol':     return item.underlying.toLowerCase();
     case '_type':      return item.type.toLowerCase();
+    case '_itmotm': {
+      const statuses=item.legs.map(l=>deriveFields(l).itmOtm);
+      if(statuses.includes('ITM')) return 'ITM';
+      if(statuses.includes('ATM')) return 'ATM';
+      return 'OTM';
+    }
     case '_bucket': {
       const b = getBucketForItem(item);
       if(!b) return 'zzz';
@@ -1985,13 +2063,14 @@ function wfSortValItem(item, colKey) {
 }
 
 function wfSortVal(p, colKey){
-  if(colKey==='_pae'||colKey==='_pae_pct'||colKey==='_ann_yield'||colKey==='_capital'||colKey==='_type'){
+  if(colKey==='_pae'||colKey==='_pae_pct'||colKey==='_ann_yield'||colKey==='_capital'||colKey==='_type'||colKey==='_itmotm'){
     const d=deriveFields(p);
     if(colKey==='_pae') return d.pae;
     if(colKey==='_pae_pct') return d.paePct;
     if(colKey==='_ann_yield') return d._annYield;
     if(colKey==='_capital') return d._capital;
     if(colKey==='_type') return d._stratType||'';
+    if(colKey==='_itmotm') return d.itmOtm||'';
   }
   if(colKey==='_bucket'){
     const b=getBucketForPosition(p);
@@ -2086,6 +2165,16 @@ function renderWFTable(itemsOrLegs, bucketId, currentBucket){
         if(col.key==='Theta'){
           return TD(s,true,`<span class="mono">${agg.totalTheta.toFixed(2)}</span>`);
         }
+        if(col.key==='IV Rank'){
+          const shortLeg=item.legs.find(l=>cleanNum(l['Quantity'])<0)||item.legs[0];
+          const ivr=cleanNum(shortLeg['IV Rank']);
+          return TD(s,true,ivr!==null?`<span class="mono">${ivr.toFixed(1)}</span>`:'—');
+        }
+        if(col.key==='_itmotm'){
+          const statuses=item.legs.map(l=>deriveFields(l).itmOtm);
+          const status=statuses.includes('ITM')?'ITM':statuses.includes('ATM')?'ATM':'OTM';
+          return TD(s,false,itmOtmBadge(status));
+        }
         return TD(s,align,'');
       }).join('');
 
@@ -2116,7 +2205,7 @@ function renderWFTable(itemsOrLegs, bucketId, currentBucket){
         // Bucket column: show currentBucket (where it actually sits), not re-evaluated
         if(col.key==='_bucket') return TD(s,false, currentBucket?bucketTag(currentBucket):'<span style="color:var(--tx3)">—</span>');
         if(col.key==='_type') return TD(s,false, strategyTag(item.type));
-        const val = col.key==='_pae'?'__pae__':col.key==='_pae_pct'?'__pae_pct__':col.key==='_ann_yield'?'__ann_yield__':col.key==='_capital'?'__capital__':p[col.key];
+        const val = col.key==='_itmotm'?'__itmotm__':col.key==='_pae'?'__pae__':col.key==='_pae_pct'?'__pae_pct__':col.key==='_ann_yield'?'__ann_yield__':col.key==='_capital'?'__capital__':p[col.key];
         return TD(s,align, fmtWFCell(col,val,derived,p));
       }).join('');
       return `<tr style="cursor:default" onmouseover="this.style.background='#FAFAF7'" onmouseout="this.style.background=''">${cells}</tr>`;
@@ -2164,6 +2253,10 @@ function fmtWFCell(col, val, derived, pos){
   if(val==='__type__'){
     const t = derived?._stratType || 'Unknown';
     return strategyTag(t);
+  }
+  // Handle _itmotm sentinel
+  if(val==='__itmotm__'){
+    return itmOtmBadge(derived?.itmOtm||null);
   }
   // Reuse main fmtCell for all other formats
   return fmtCell(col,val,derived,pos);
@@ -2348,7 +2441,7 @@ function deleteBucket(){
 function fmt$(v,sign=false){
   const n=parseFloat(v);
   if(isNaN(n))return '—';
-  const abs=Math.abs(n).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+  const abs=Math.abs(n).toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:0});
   if(sign)return (n>=0?'+$':'-$')+abs;
   return '$'+abs;
 }
@@ -2398,6 +2491,10 @@ function resetWFCols(){
 
 // Ensure column state is consistent after load or when new columns are added
 function sanitizeColState(){
+  // Prune removed columns from stored state
+  const removedCols = new Set(['P/L YTD','Ext RoR %']);
+  colOrder = colOrder.filter(k => !removedCols.has(k));
+  removedCols.forEach(k => { delete colWidths[k]; delete colHidden[k]; });
   // Add any new ALL_COLS keys not in colOrder
   ALL_COLS.forEach(c=>{ if(!colOrder.includes(c.key)) colOrder.push(c.key); });
   // Add any new WF_COLS keys not in wfColOrder
