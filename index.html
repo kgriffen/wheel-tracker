@@ -680,6 +680,11 @@ function handleImport(e){
       const row={};
       headers.forEach((h,j)=>row[h.trim()]=(cols[j]||'').trim());
       if(!row['Symbol']) continue;
+      // Normalize Tastytrade's raw Type strings to internal constants
+      const rawType=(row['Type']||'').toLowerCase();
+      if(rawType==='future option'||rawType==='futures option'||rawType==='futures_option') row['Type']='FUTURES_OPTION';
+      else if(rawType==='equity'||rawType==='stock') row['Type']='EQUITY';
+      else if(rawType==='option'||rawType==='equity option') row['Type']='OPTION';
       rows.push(row);
     }
     positions=rows;
