@@ -373,13 +373,23 @@ input[type=checkbox]{width:13px;height:13px;cursor:pointer;accent-color:var(--tx
   <div class="modal" style="width:min(560px,100%)">
     <div class="mtitle" id="bucket-mo-title">Create bucket</div>
     <input type="hidden" id="bkt-id">
+    <input type="hidden" id="bkt-operator" value="AND">
     <div class="fr"><label>Bucket name</label><input id="bkt-name" placeholder="e.g. Ready to Close"></div>
     <div class="fr">
       <label>Color</label>
       <div class="color-swatches" id="color-swatches"></div>
     </div>
     <div class="fr" style="margin-top:10px">
-      <label style="margin-bottom:6px;display:block">Conditions <span style="font-weight:400;color:var(--tx3)">(all must match)</span></label>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+        <label style="margin-bottom:0">Conditions</label>
+        <div style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--tx3)">
+          <span>Match</span>
+          <div id="op-toggle" style="display:flex;border:1px solid var(--bdr2);border-radius:var(--r);overflow:hidden;font-size:11px">
+            <button id="op-and-btn" onclick="setBucketOperator('AND')" style="padding:2px 9px;border:none;cursor:pointer;font-family:inherit;font-size:11px;font-weight:600;transition:all .12s">ALL</button>
+            <button id="op-or-btn"  onclick="setBucketOperator('OR')"  style="padding:2px 9px;border:none;cursor:pointer;font-family:inherit;font-size:11px;font-weight:600;transition:all .12s">ANY</button>
+          </div>
+        </div>
+      </div>
       <div id="cond-rows"></div>
       <button class="add-cond-btn" onclick="addCondRow()">+ Add condition</button>
     </div>
@@ -1421,12 +1431,14 @@ function getUnderlying(sym) {
 
 function getFuturesMultiplier(sym) {
   if(!sym) return null;
-  // Strip leading ./ and contract suffix (e.g. ./ESH6 → ES)
-  const root = sym.startsWith('./')
-    ? sym.split(' ')[0].replace('./','').replace(/[A-Z]\d+$/,'')
-    : sym.replace(/[A-Z]\d+$/,'');
+  // Strip leading ./ and space-separated suffix, then extract root by stripping
+  // from the first month-code (single uppercase letter followed by a digit) onward.
+  // This handles simple contracts (ESH6→ES), micro roots (MESM6→MES),
+  // and Tastytrade concatenated spread symbols (RTYM6RTOM6→RTY, HEX6→HE, LEM6→LE).
+  const clean = sym.startsWith('./') ? sym.split(' ')[0].replace('./','') : sym;
+  const root = clean.replace(/[A-Z]\d.*$/, '');
   const MULTIPLIERS = {
-    'ES':1000,'MES':5,       // /MES micro S&P, /ES e-mini S&P — note: ES notional is 50*price but premium multiplier is 50
+    'ES':50,'MES':5,
     'NQ':20,'MNQ':2,
     'RTY':50,'M2K':5,
     'YM':5,'MYM':0.5,
@@ -1440,6 +1452,7 @@ function getFuturesMultiplier(sym) {
     '6E':125000,'6J':12500000,'6B':62500,'6C':100000,'6A':100000,'6S':125000,'6N':100000,
     'VX':1000,
     'BTC':5,'MBT':0.1,'ETH':50,'MET':0.1,
+    'HE':400,'LE':400,       // Lean Hogs, Live Cattle (40,000 lbs, options quoted cents/lb)
   };
   return MULTIPLIERS[root] || null;
 }
@@ -1649,7 +1662,8 @@ function spreadAggregate(legs) {
 function spreadMatchesBucket(legs, bucket) {
   if(!bucket.conditions || !bucket.conditions.length) return false;
   const agg = spreadAggregate(legs);
-  return bucket.conditions.every(cond => {
+  const useOR = (bucket.operator||'AND') === 'OR';
+  const evalOne = cond => {
     const {field, op, value} = cond;
     let actual = null;
     switch(field) {
@@ -1677,7 +1691,10 @@ function spreadMatchesBucket(legs, bucket) {
       case '!=': return String(actual) !== String(value);
       default:   return false;
     }
-  });
+  };
+  return useOR
+    ? bucket.conditions.some(evalOne)
+    : bucket.conditions.every(evalOne);
 }
 
 function getBucketForItem(item) {
@@ -1792,7 +1809,10 @@ function evalCondition(p,cond){
 
 function matchesBucket(p,bucket){
   if(!bucket.conditions||!bucket.conditions.length) return false;
-  return bucket.conditions.every(c=>evalCondition(p,c));
+  const useOR = (bucket.operator||'AND') === 'OR';
+  return useOR
+    ? bucket.conditions.some(c=>evalCondition(p,c))
+    : bucket.conditions.every(c=>evalCondition(p,c));
 }
 
 function renderWorkflow(){
@@ -1840,7 +1860,8 @@ function renderWorkflow(){
     const pop=popsArr.length?Math.round(popsArr.reduce((s,p)=>s+(cleanNum(p['PoP'])||0),0)/popsArr.length):null;
     const totalPAE=bktLegs.reduce((s,p)=>{const d=deriveFields(p);return s+(d.pae!==null?d.pae:0);},0);
     const hasPAE=bktLegs.some(p=>deriveFields(p).pae!==null);
-    const condSummary=b.conditions.map(c=>{const f=COND_FIELDS.find(x=>x.value===c.field);return `${f?f.label:c.field} ${c.op} ${c.value}`;}).join(' AND ');
+    const condJoiner = (b.operator||'AND') === 'OR' ? ' OR ' : ' AND ';
+    const condSummary=b.conditions.map(c=>{const f=COND_FIELDS.find(x=>x.value===c.field);return `${f?f.label:c.field} ${c.op} ${c.value}`;}).join(condJoiner);
     const bIdx=buckets.findIndex(x=>x.id===b.id);
     return `<div class="wf-bucket" draggable="true" data-bucket-id="${b.id}"
       ondragstart="bucketDragStart(event,this)" ondragover="bucketDragOver(event,this)"
@@ -2318,6 +2339,24 @@ function toggleWFBucket(hdr){
 // ═══════════════════════════════════════════════════════════
 let editingBucketId=null;
 
+function setBucketOperator(op) {
+  document.getElementById('bkt-operator').value = op;
+  const andBtn = document.getElementById('op-and-btn');
+  const orBtn  = document.getElementById('op-or-btn');
+  if(!andBtn || !orBtn) return;
+  if(op === 'OR') {
+    andBtn.style.background = 'var(--surf2)'; andBtn.style.color = 'var(--tx2)';
+    orBtn.style.background  = 'var(--blue)';  orBtn.style.color  = '#fff';
+  } else {
+    andBtn.style.background = 'var(--blue)';  andBtn.style.color = '#fff';
+    orBtn.style.background  = 'var(--surf2)'; orBtn.style.color  = 'var(--tx2)';
+  }
+}
+
+function getBucketOperator() {
+  return document.getElementById('bkt-operator')?.value || 'AND';
+}
+
 function openBucketBuilder(id){
   editingBucketId=id;
   const isEdit=id!==null;
@@ -2343,6 +2382,8 @@ function openBucketBuilder(id){
   }
 
   openM('bucket-mo');
+  // Set operator toggle after modal is in DOM
+  setBucketOperator(existing?.operator || 'AND');
 }
 
 function selectSwatch(el){
@@ -2405,6 +2446,7 @@ function saveBucket(){
   const name=document.getElementById('bkt-name').value.trim();
   if(!name){alert('Please enter a bucket name.');return;}
   const color=document.querySelector('.color-swatch.selected')?.dataset.color||SWATCH_COLORS[0];
+  const operator=getBucketOperator();
 
   // Collect conditions
   const conditions=[];
@@ -2420,9 +2462,9 @@ function saveBucket(){
 
   if(editingBucketId){
     const i=buckets.findIndex(b=>b.id===editingBucketId);
-    if(i>=0)buckets[i]={...buckets[i],name,color,conditions};
+    if(i>=0)buckets[i]={...buckets[i],name,color,conditions,operator};
   } else {
-    buckets.push({id:'b-'+Date.now(),name,color,conditions});
+    buckets.push({id:'b-'+Date.now(),name,color,conditions,operator});
   }
 
   saveToLocal();closeM('bucket-mo');renderWorkflow();
