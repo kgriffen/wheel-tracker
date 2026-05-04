@@ -1416,6 +1416,8 @@ const STRATEGY_STYLES = {
   'Covered Call':        {color:'#0F9B8E', bg:'#E0F5F3'},
   'Strangle':            {color:'#7B3FA0', bg:'#F3E8FF'},
   'Jade Lizard':         {color:'#C26D1A', bg:'#FEF0DC'},
+  'Rooster':             {color:'#8B2500', bg:'#FDEBD0'},
+  'Zero Loss Butterfly': {color:'#1A6B5A', bg:'#E0F5F0'},
   'Vertical Put Spread': {color:'#1A6B8A', bg:'#E0F2F9'},
   'Vertical Call Spread':{color:'#2D6B3F', bg:'#E4F5EB'},
   'Put Calendar':        {color:'#8A5A1A', bg:'#FDF2E0'},
@@ -1498,6 +1500,13 @@ function classifyLegs(legs) {
   // Strangle: 1 short put + 1 short call, same exp, no longs
   if(shortPuts.length===1 && shortCalls.length===1 && longPuts.length===0 && longCalls.length===0 && sameExp)
     return 'Strangle';
+  // Rooster: Jade Lizard base (1 short put + 1 short call + 1 long call, sc < lc)
+  // plus 2+ far-OTM long puts (put ratio), same exp — check BEFORE Jade Lizard
+  if(shortPuts.length===1 && shortCalls.length===1 && longCalls.length===1 && longPuts.length>=2 && sameExp) {
+    const sc = parseFloat(shortCalls[0]['Strike Price']);
+    const lc = parseFloat(longCalls[0]['Strike Price']);
+    if(sc < lc) return 'Rooster';
+  }
   // Jade Lizard: 1 short put + 1 short call + 1 long call, same exp
   if(shortPuts.length===1 && shortCalls.length===1 && longCalls.length===1 && longPuts.length===0 && sameExp) {
     const sc = parseFloat(shortCalls[0]['Strike Price']);
@@ -1517,6 +1526,15 @@ function classifyLegs(legs) {
     }
     // Call Calendar: 1 short call + 1 long call, different expirations
     if(shortCalls.length===1 && longCalls.length===1 && shortPuts.length===0 && longPuts.length===0) return 'Call Calendar';
+  }
+  // Zero Loss Butterfly: 100 shares long stock + 1 long put + 2 short calls (same strike) + 1 long call (higher strike)
+  const stockLegs = legs.filter(l => (l['Type']||'') === 'EQUITY' && parseInt(l['Quantity']||0) > 0);
+  if(stockLegs.length===1 && longPuts.length===1 && shortCalls.length===2 && longCalls.length===1) {
+    const sc0 = parseFloat(shortCalls[0]['Strike Price']);
+    const sc1 = parseFloat(shortCalls[1]['Strike Price']);
+    const lc  = parseFloat(longCalls[0]['Strike Price']);
+    // Both short calls same strike, long call higher
+    if(Math.abs(sc0 - sc1) < 0.01 && lc > sc0) return 'Zero Loss Butterfly';
   }
   return 'Complex';
 }
@@ -1567,6 +1585,34 @@ function buildDisplayItems(positionList) {
         unusedLegs.forEach(l => used.add(l));
       }
     }
+  });
+
+  // Zero Loss Butterfly: long stock + 1 long put + 2 short calls (same strike) + 1 long call (higher strike)
+  Object.entries(byUnderlying).forEach(([und, legs]) => {
+    const stockLegs  = legs.filter(l => (l['Type']||'') === 'EQUITY' && !used.has(l) && parseInt(l['Quantity']||0) > 0);
+    const lPuts      = legs.filter(l => (l['Type']||'') !== 'EQUITY' && !used.has(l) && parseInt(l['Quantity']||0) > 0 && l['Call/Put']==='Put');
+    const sCalls     = legs.filter(l => (l['Type']||'') !== 'EQUITY' && !used.has(l) && parseInt(l['Quantity']||0) < 0 && l['Call/Put']==='Call');
+    const lCalls     = legs.filter(l => (l['Type']||'') !== 'EQUITY' && !used.has(l) && parseInt(l['Quantity']||0) > 0 && l['Call/Put']==='Call');
+    if(!stockLegs.length || lPuts.length < 1 || sCalls.length < 2 || !lCalls.length) return;
+    // Find 2 short calls at same strike
+    let scPair = null;
+    for(let i = 0; i < sCalls.length && !scPair; i++) {
+      for(let j = i+1; j < sCalls.length && !scPair; j++) {
+        const s0 = parseFloat(sCalls[i]['Strike Price']);
+        const s1 = parseFloat(sCalls[j]['Strike Price']);
+        if(Math.abs(s0 - s1) < 0.01) scPair = [sCalls[i], sCalls[j]];
+      }
+    }
+    if(!scPair) return;
+    const scStrike = parseFloat(scPair[0]['Strike Price']);
+    // Find long call above short call strike
+    const lc = lCalls.find(l => parseFloat(l['Strike Price']) > scStrike);
+    if(!lc) return;
+    const stock = stockLegs[0];
+    const lp    = lPuts[0];
+    const zlbLegs = [stock, lp, scPair[0], scPair[1], lc];
+    items.push({ isSpread: true, legs: zlbLegs, type: 'Zero Loss Butterfly', underlying: und });
+    zlbLegs.forEach(l => used.add(l));
   });
 
   // Covered Call: EQUITY long + short call, 1 call per 100 shares
