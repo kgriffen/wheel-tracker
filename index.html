@@ -1399,6 +1399,7 @@ const COND_FIELDS=[
   {value:'cost',        label:'Premium (Cost $)',    type:'number', ops:['>=','<=','>','<','=']},
   {value:'cp',          label:'Call/Put',             type:'select', ops:['=','!='], choices:['Put','Call']},
   {value:'type',        label:'Instrument Type',     type:'select', ops:['=','!='], choices:['OPTION','FUTURES_OPTION']},
+  {value:'strategy',    label:'Strategy Type',        type:'select', ops:['=','!='], choices:['Naked Put','Naked Call','Long Put','Long Call','Stock','Covered Call','Strangle','Jade Lizard','Rooster','Vertical Put Spread','Vertical Call Spread','Put Calendar','Call Calendar','PMCC','Zero Loss Butterfly','Complex','Unknown']},
   {value:'early_profit',label:'Early Profit Rule',   type:'select', ops:['='], choices:['true']},
   {value:'pae',         label:'PAE $ (Profit at Expiration)', type:'number', ops:['>=','<=','>','<','=']},
   {value:'pae_pct',     label:'PAE % (of premium)',           type:'number', ops:['>=','<=','>','<','=']},
@@ -1501,11 +1502,15 @@ function classifyLegs(legs) {
   if(shortPuts.length===1 && shortCalls.length===1 && longPuts.length===0 && longCalls.length===0 && sameExp)
     return 'Strangle';
   // Rooster: Jade Lizard base (1 short put + 1 short call + 1 long call, sc < lc)
-  // plus 2+ far-OTM long puts (put ratio), same exp — check BEFORE Jade Lizard
-  if(shortPuts.length===1 && shortCalls.length===1 && longCalls.length===1 && longPuts.length>=2 && sameExp) {
-    const sc = parseFloat(shortCalls[0]['Strike Price']);
-    const lc = parseFloat(longCalls[0]['Strike Price']);
-    if(sc < lc) return 'Rooster';
+  // plus 2+ far-OTM long put contracts (put ratio), same exp — check BEFORE Jade Lizard.
+  // Count by contract QUANTITY (not row count) since Tastytrade may collapse same-strike contracts into one row.
+  if(shortPuts.length===1 && shortCalls.length===1 && longCalls.length===1 && longPuts.length>=1 && sameExp) {
+    const longPutContracts = longPuts.reduce((s,l)=>s+Math.abs(parseInt(l['Quantity']||0)),0);
+    if(longPutContracts >= 2) {
+      const sc = parseFloat(shortCalls[0]['Strike Price']);
+      const lc = parseFloat(longCalls[0]['Strike Price']);
+      if(sc < lc) return 'Rooster';
+    }
   }
   // Jade Lizard: 1 short put + 1 short call + 1 long call, same exp
   if(shortPuts.length===1 && shortCalls.length===1 && longCalls.length===1 && longPuts.length===0 && sameExp) {
@@ -1527,14 +1532,25 @@ function classifyLegs(legs) {
     // Call Calendar: 1 short call + 1 long call, different expirations
     if(shortCalls.length===1 && longCalls.length===1 && shortPuts.length===0 && longPuts.length===0) return 'Call Calendar';
   }
-  // Zero Loss Butterfly: 100 shares long stock + 1 long put + 2 short calls (same strike) + 1 long call (higher strike)
+  // Zero Loss Butterfly: 100 shares long stock + 1 long put + 2 short call contracts (same strike) + 1 long call (higher strike)
+  // Tastytrade may collapse same-strike contracts into one row, so accept either:
+  //   - 1 short-call row with qty=-2, OR
+  //   - 2 short-call rows at the same strike (each qty=-1)
   const stockLegs = legs.filter(l => (l['Type']||'') === 'EQUITY' && parseInt(l['Quantity']||0) > 0);
-  if(stockLegs.length===1 && longPuts.length===1 && shortCalls.length===2 && longCalls.length===1) {
-    const sc0 = parseFloat(shortCalls[0]['Strike Price']);
-    const sc1 = parseFloat(shortCalls[1]['Strike Price']);
-    const lc  = parseFloat(longCalls[0]['Strike Price']);
-    // Both short calls same strike, long call higher
-    if(Math.abs(sc0 - sc1) < 0.01 && lc > sc0) return 'Zero Loss Butterfly';
+  if(stockLegs.length===1 && longPuts.length===1 && longCalls.length===1) {
+    const totalShortCallContracts = shortCalls.reduce((s,l)=>s+Math.abs(parseInt(l['Quantity']||0)),0);
+    let validShortCallStrike = null;
+    if(shortCalls.length===1 && totalShortCallContracts===2) {
+      validShortCallStrike = parseFloat(shortCalls[0]['Strike Price']);
+    } else if(shortCalls.length===2 && totalShortCallContracts===2) {
+      const s0 = parseFloat(shortCalls[0]['Strike Price']);
+      const s1 = parseFloat(shortCalls[1]['Strike Price']);
+      if(Math.abs(s0 - s1) < 0.01) validShortCallStrike = s0;
+    }
+    if(validShortCallStrike !== null) {
+      const lc = parseFloat(longCalls[0]['Strike Price']);
+      if(lc > validShortCallStrike) return 'Zero Loss Butterfly';
+    }
   }
   return 'Complex';
 }
@@ -1553,13 +1569,57 @@ function buildDisplayItems(positionList) {
   const used = new Set();
   const items = [];
 
+  // Zero Loss Butterfly (PRIORITY): long stock + 1 long put + 2 short call contracts (same strike) + 1 long call (higher strike).
+  // Must run BEFORE the same-exp pass, otherwise the option legs alone get grouped as Complex.
+  // Tastytrade may collapse same-strike contracts into a single row, so we accept either
+  // one short-call row with qty=-2 OR two short-call rows at the same strike.
+  Object.entries(byUnderlying).forEach(([und, legs]) => {
+    const stockLegs  = legs.filter(l => (l['Type']||'') === 'EQUITY' && !used.has(l) && parseInt(l['Quantity']||0) > 0);
+    const lPuts      = legs.filter(l => (l['Type']||'') !== 'EQUITY' && !used.has(l) && parseInt(l['Quantity']||0) > 0 && l['Call/Put']==='Put');
+    const sCalls     = legs.filter(l => (l['Type']||'') !== 'EQUITY' && !used.has(l) && parseInt(l['Quantity']||0) < 0 && l['Call/Put']==='Call');
+    const lCalls     = legs.filter(l => (l['Type']||'') !== 'EQUITY' && !used.has(l) && parseInt(l['Quantity']||0) > 0 && l['Call/Put']==='Call');
+    if(!stockLegs.length || !lPuts.length || !sCalls.length || !lCalls.length) return;
+
+    // Find a short-call configuration with exactly 2 contracts at the same strike
+    let scLegs = null;
+    let scStrike = null;
+    // Case A: one row with qty=-2
+    const collapsed = sCalls.find(l => Math.abs(parseInt(l['Quantity']||0)) === 2);
+    if(collapsed) {
+      scLegs = [collapsed];
+      scStrike = parseFloat(collapsed['Strike Price']);
+    } else {
+      // Case B: two rows with qty=-1 each at the same strike
+      for(let i = 0; i < sCalls.length && !scLegs; i++) {
+        for(let j = i+1; j < sCalls.length && !scLegs; j++) {
+          if(Math.abs(parseInt(sCalls[i]['Quantity']||0))===1 && Math.abs(parseInt(sCalls[j]['Quantity']||0))===1) {
+            const s0 = parseFloat(sCalls[i]['Strike Price']);
+            const s1 = parseFloat(sCalls[j]['Strike Price']);
+            if(Math.abs(s0 - s1) < 0.01) { scLegs = [sCalls[i], sCalls[j]]; scStrike = s0; }
+          }
+        }
+      }
+    }
+    if(!scLegs) return;
+
+    // Find long call above short call strike
+    const lc = lCalls.find(l => parseFloat(l['Strike Price']) > scStrike);
+    if(!lc) return;
+    const stock = stockLegs[0];
+    const lp    = lPuts[0];
+    const zlbLegs = [stock, lp, ...scLegs, lc];
+    items.push({ isSpread: true, legs: zlbLegs, type: 'Zero Loss Butterfly', underlying: und });
+    zlbLegs.forEach(l => used.add(l));
+  });
+
   // For each underlying, try to form multi-leg groups by same expiration first
   Object.entries(byUnderlying).forEach(([und, legs]) => {
     if(legs.length === 1) return; // handled below
 
-    // Group by expiration
+    // Group by expiration — skip legs already consumed by an earlier pass (e.g. ZLB)
     const byExp = {};
     legs.forEach(l => {
+      if(used.has(l)) return;
       const exp = l['Exp Date'] || 'none';
       if(!byExp[exp]) byExp[exp] = [];
       byExp[exp].push(l);
@@ -1585,34 +1645,6 @@ function buildDisplayItems(positionList) {
         unusedLegs.forEach(l => used.add(l));
       }
     }
-  });
-
-  // Zero Loss Butterfly: long stock + 1 long put + 2 short calls (same strike) + 1 long call (higher strike)
-  Object.entries(byUnderlying).forEach(([und, legs]) => {
-    const stockLegs  = legs.filter(l => (l['Type']||'') === 'EQUITY' && !used.has(l) && parseInt(l['Quantity']||0) > 0);
-    const lPuts      = legs.filter(l => (l['Type']||'') !== 'EQUITY' && !used.has(l) && parseInt(l['Quantity']||0) > 0 && l['Call/Put']==='Put');
-    const sCalls     = legs.filter(l => (l['Type']||'') !== 'EQUITY' && !used.has(l) && parseInt(l['Quantity']||0) < 0 && l['Call/Put']==='Call');
-    const lCalls     = legs.filter(l => (l['Type']||'') !== 'EQUITY' && !used.has(l) && parseInt(l['Quantity']||0) > 0 && l['Call/Put']==='Call');
-    if(!stockLegs.length || lPuts.length < 1 || sCalls.length < 2 || !lCalls.length) return;
-    // Find 2 short calls at same strike
-    let scPair = null;
-    for(let i = 0; i < sCalls.length && !scPair; i++) {
-      for(let j = i+1; j < sCalls.length && !scPair; j++) {
-        const s0 = parseFloat(sCalls[i]['Strike Price']);
-        const s1 = parseFloat(sCalls[j]['Strike Price']);
-        if(Math.abs(s0 - s1) < 0.01) scPair = [sCalls[i], sCalls[j]];
-      }
-    }
-    if(!scPair) return;
-    const scStrike = parseFloat(scPair[0]['Strike Price']);
-    // Find long call above short call strike
-    const lc = lCalls.find(l => parseFloat(l['Strike Price']) > scStrike);
-    if(!lc) return;
-    const stock = stockLegs[0];
-    const lp    = lPuts[0];
-    const zlbLegs = [stock, lp, scPair[0], scPair[1], lc];
-    items.push({ isSpread: true, legs: zlbLegs, type: 'Zero Loss Butterfly', underlying: und });
-    zlbLegs.forEach(l => used.add(l));
   });
 
   // Covered Call: EQUITY long + short call, 1 call per 100 shares
@@ -1710,7 +1742,7 @@ function spreadAggregate(legs) {
 }
 
 // For bucket matching on a spread: evaluate bucket against spread aggregate
-function spreadMatchesBucket(legs, bucket) {
+function spreadMatchesBucket(legs, bucket, stratType) {
   if(!bucket.conditions || !bucket.conditions.length) return false;
   const agg = spreadAggregate(legs);
   const useOR = (bucket.operator||'AND') === 'OR';
@@ -1724,10 +1756,11 @@ function spreadMatchesBucket(legs, bucket) {
       case 'pop':       actual = agg.avgPoP; break;
       case 'pae':       actual = agg.pae; break;
       case 'pae_pct':   actual = agg.paePct; break;
+      case 'strategy':  actual = stratType || ''; break;
       // For per-leg fields, use first short leg
       default: {
         const shortLeg = legs.find(l => parseInt(l['Quantity']) < 0) || legs[0];
-        return shortLeg ? evalCondition(shortLeg, cond) : false;
+        return shortLeg ? evalCondition(shortLeg, cond, stratType) : false;
       }
     }
     if(actual === null) return false;
@@ -1751,7 +1784,7 @@ function spreadMatchesBucket(legs, bucket) {
 function getBucketForItem(item) {
   if(!item.isSpread) return getBucketForPosition(item.position);
   for(const b of buckets) {
-    if(spreadMatchesBucket(item.legs, b)) return b;
+    if(spreadMatchesBucket(item.legs, b, item.type)) return b;
   }
   return null;
 }
@@ -1805,7 +1838,7 @@ function getBucketForPosition(p){
   return null;
 }
 
-function evalCondition(p,cond){
+function evalCondition(p,cond,stratType){
   const derived=deriveFields(p);
   const {field,op,value}=cond;
   let actual=null;
@@ -1821,6 +1854,7 @@ function evalCondition(p,cond){
     case 'cost':      actual=cleanNum(p['Cost']); break;
     case 'cp':        actual=p['Call/Put']||''; break;
     case 'type':      actual=p['Type']||''; break;
+    case 'strategy':  actual=stratType||derived._stratType||''; break;
     case 'early_profit': actual=derived.earlyProfit?'true':'false'; break;
     case 'pae':     actual=derived.pae; break;
     case 'pae_pct': actual=derived.paePct; break;
