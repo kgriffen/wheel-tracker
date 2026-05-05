@@ -1763,7 +1763,11 @@ function spreadMatchesBucket(legs, bucket, stratType) {
         return shortLeg ? evalCondition(shortLeg, cond, stratType) : false;
       }
     }
-    if(actual === null) return false;
+    if(actual === null || actual === undefined) {
+      if(op === '!=') return true;
+      if(op === '=')  return false;
+      return false;
+    }
     const numVal = parseFloat(value);
     const isNum = !isNaN(numVal);
     switch(op) {
@@ -1876,7 +1880,14 @@ function evalCondition(p,cond,stratType){
     }
   }
 
-  if(actual===null||actual===undefined) return false;
+  // Null/missing data: equality comparisons get a defined answer
+  // (a null value is "not equal" to any concrete value, and "equal" only to a null filter — which we don't allow).
+  // Ordered numeric comparisons remain undefined → false.
+  if(actual===null||actual===undefined) {
+    if(op==='!=') return true;
+    if(op==='=')  return false;
+    return false;
+  }
 
   const numVal=parseFloat(value);
   const isNum=!isNaN(numVal);
@@ -1920,7 +1931,7 @@ function renderWorkflow(){
     bucketItems[b.id]=[];
     allItems.forEach(item=>{
       if(!matchedItems.has(item)){
-        const matches=item.isSpread?spreadMatchesBucket(item.legs,b):matchesBucket(item.position,b);
+        const matches=item.isSpread?spreadMatchesBucket(item.legs,b,item.type):matchesBucket(item.position,b);
         if(matches){ bucketItems[b.id].push(item); matchedItems.add(item); }
       }
     });
@@ -2007,7 +2018,7 @@ function renderWFStats(list){
     bucketCounts[b.id]=0;
     statsItems.forEach(item=>{
       if(!statsMatched.has(item)){
-        const hits=item.isSpread?spreadMatchesBucket(item.legs,b):matchesBucket(item.position,b);
+        const hits=item.isSpread?spreadMatchesBucket(item.legs,b,item.type):matchesBucket(item.position,b);
         if(hits){ bucketCounts[b.id]++; statsMatched.add(item); }
       }
     });
