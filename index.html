@@ -559,7 +559,7 @@ function deriveFields(p){
     const last = cleanNum(p['Underlying Last Price']) || cleanNum(p['Mark']);
     const plOpen = cleanNum(p['P/L Open']);
     return {
-      itmOtm: null, strikeDist: null, earlyProfit: false,
+      itmOtm: null, strikeDist: null, dts: null, earlyProfit: false,
       pae: null, paePct: null, _annYield: null,
       _capital: cost !== null ? Math.abs(cost) : null,
       _stratType: 'Stock',
@@ -581,8 +581,18 @@ function deriveFields(p){
   // ITM/OTM/ATM
   let itmOtm=null;
   let strikeDist=null;
+  let dts=null;
   if(strike!=null&&last!=null&&last!==0){
     strikeDist=((strike-last)/last)*100;
+    // DTS: signed % move needed for underlying to reach strike.
+    // Positive = OTM (room to breathe), negative = ITM (already breached).
+    // For Put: OTM means last > strike, so (last - strike)/last is positive.
+    // For Call: OTM means last < strike, so (strike - last)/last is positive.
+    dts = cp==='Put'
+      ? ((last - strike) / last) * 100
+      : cp==='Call'
+        ? ((strike - last) / last) * 100
+        : null;
     if(cp==='Put'){
       if(strike>last*1.005) itmOtm='ITM';
       else if(strike<last*0.995) itmOtm='OTM';
@@ -659,7 +669,7 @@ function deriveFields(p){
   // Strategy type for single positions (spread type set at render time)
   const _stratType = classifyLegs([p]);
 
-  return {itmOtm,strikeDist,earlyProfit,pae,paePct,_annYield,_capital,_stratType,
+  return {itmOtm,strikeDist,dts,earlyProfit,pae,paePct,_annYield,_capital,_stratType,
     _dte:dte,_daysOpn:daysOpn,_plOpen:plOpen,_plPct:plPct,_cost:cost,_pop:pop,_qty:qty,_strike:strike,_last:last};
 }
 
@@ -868,6 +878,15 @@ function fmtCell(col,val,derived,pos){
       const n = val==='__capital__' ? derived?._capital : cleanNum(val);
       if(n===null||n===undefined) return '<span style="color:var(--tx3)">—</span>';
       return `<span class="mono">$${n.toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:0})}</span>`;
+    }
+    case 'dts':{
+      // DTS: signed % distance to strike. Positive=OTM (safe), Negative=ITM (breached).
+      // Color: >=10% green, 3-10% amber, <3% or ITM red.
+      const n = val==='__dts__' ? derived?.dts : cleanNum(val);
+      if(n===null||n===undefined) return '<span style="color:var(--tx3)">—</span>';
+      const cls = n<0 ? 'cr' : n<3 ? 'cr' : n<10 ? 'ca' : 'cg';
+      const sign = n<0 ? '−' : '';
+      return `<span class="mono ${cls}" style="font-weight:500">${sign}${Math.abs(n).toFixed(1)}%</span>`;
     }
     default:
       return `<span style="font-size:12px">${val}</span>`;
@@ -1737,8 +1756,31 @@ function spreadAggregate(legs) {
   const sharedExp = allSameExp ? legs[0]['Exp Date'] : null;
   const sharedDTE = allSameExp ? legs[0]['DTE'] : null;
 
+  // DTS: distance to nearest short-leg strike, signed (negative = ITM/breached).
+  // For spreads we ignore long legs (risk caps, not assignment drivers) — same
+  // philosophy as avgPoP above. Picks the leg closest to ITM across all shorts.
+  const dts = (() => {
+    if(lastPrice === null || lastPrice === 0) return null;
+    const shorts = legs.filter(l => cleanNum(l['Quantity']) < 0 && (l['Type']||'') !== 'EQUITY');
+    if(!shorts.length) return null;
+    let nearest = null;
+    shorts.forEach(l => {
+      const strike = cleanNum(l['Strike Price']);
+      const cp = l['Call/Put'] || '';
+      if(strike === null || !cp) return;
+      // Signed: positive when OTM (room to breathe), negative when ITM (already through).
+      // Put OTM = last > strike, so signed dist = (last - strike)/last (positive when OTM).
+      // Call OTM = last < strike, so signed dist = (strike - last)/last (positive when OTM).
+      const signed = cp === 'Put'
+        ? ((lastPrice - strike) / lastPrice) * 100
+        : ((strike - lastPrice) / lastPrice) * 100;
+      if(nearest === null || Math.abs(signed) < Math.abs(nearest)) nearest = signed;
+    });
+    return nearest;
+  })();
+
   return { totalCost, totalPLOpen, plPct, minDTE, avgPoP, pae, paePct, totalMark,
-           totalPLDay, totalDelta, totalTheta, lastPrice, sharedExp, sharedDTE };
+           totalPLDay, totalDelta, totalTheta, lastPrice, sharedExp, sharedDTE, dts };
 }
 
 // For bucket matching on a spread: evaluate bucket against spread aggregate
@@ -2132,6 +2174,7 @@ const WF_COLS = [
   {key:'_pae_pct',          label:'PAE %',      width:58,  sortable:true,  fmt:'pae-pct'},
   {key:'P/L Day',           label:'P/L Day',    width:65,  sortable:true,  fmt:'pl-money'},
   {key:'PoP',               label:'PoP',        width:50,  sortable:true,  fmt:'pop'},
+  {key:'_dts',              label:'DTS',        width:54,  sortable:true,  fmt:'dts'},
   {key:'IV Rank',           label:'IVR',        width:44,  sortable:true,  fmt:'num1'},
   {key:'Underlying Last Price', label:'Last',   width:75,  sortable:true,  fmt:'price2'},
   {key:'β Delta',           label:'β Δ',        width:55,  sortable:true,  fmt:'num2'},
@@ -2153,6 +2196,7 @@ function wfSortValItem(item, colKey) {
     case 'P/L Day':    return agg.totalPLDay;
     case 'Cost':       return agg.totalCost;
     case 'PoP':        return agg.avgPoP;
+    case '_dts':       return agg.dts;
     case 'DTE':        return agg.minDTE < 999 ? agg.minDTE : null;
     case 'Exp Date':   return agg.sharedExp || null;
     case '/ Delta':    return agg.totalDelta;
@@ -2180,7 +2224,7 @@ function wfSortValItem(item, colKey) {
 }
 
 function wfSortVal(p, colKey){
-  if(colKey==='_pae'||colKey==='_pae_pct'||colKey==='_ann_yield'||colKey==='_capital'||colKey==='_type'||colKey==='_itmotm'){
+  if(colKey==='_pae'||colKey==='_pae_pct'||colKey==='_ann_yield'||colKey==='_capital'||colKey==='_type'||colKey==='_itmotm'||colKey==='_dts'){
     const d=deriveFields(p);
     if(colKey==='_pae') return d.pae;
     if(colKey==='_pae_pct') return d.paePct;
@@ -2188,6 +2232,7 @@ function wfSortVal(p, colKey){
     if(colKey==='_capital') return d._capital;
     if(colKey==='_type') return d._stratType||'';
     if(colKey==='_itmotm') return d.itmOtm||'';
+    if(colKey==='_dts') return d.dts;
   }
   if(colKey==='_bucket'){
     const b=getBucketForPosition(p);
@@ -2241,7 +2286,7 @@ function renderWFTable(itemsOrLegs, bucketId, currentBucket){
   const TD = (style,align,html) =>
     `<td style="${style};${align?'text-align:right':''};padding:6px 8px;border-bottom:1px solid var(--bdr);border-right:1px solid var(--bdr);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;vertical-align:middle;font-size:12px">${html}</td>`;
 
-  const ALIGNS = new Set(['money','pl-money','pl-pct','pop','num1','num2','price2','price4','qty','dte','days','pae-money','pae-pct','ann-yield','capital']);
+  const ALIGNS = new Set(['money','pl-money','pl-pct','pop','num1','num2','price2','price4','qty','dte','days','pae-money','pae-pct','ann-yield','capital','dts']);
 
   const tbody = sortedItems.map((item, iidx) => {
     if(item.isSpread) {
@@ -2266,6 +2311,13 @@ function renderWFTable(itemsOrLegs, bucketId, currentBucket){
         if(col.key==='P/L Open') return TD(s,true,`<span class="mono ${plCls}">${agg.totalPLOpen>=0?'+$':'-$'}${Math.abs(agg.totalPLOpen).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}</span>`);
         if(col.key==='P/L Opn%') return TD(s,true,`<span class="mono ${plCls}">${agg.plPct!==null?agg.plPct.toFixed(1)+'%':'—'}</span>`);
         if(col.key==='PoP') return TD(s,true,`<span class="mono ${agg.avgPoP>=65?'cg':agg.avgPoP>=50?'ca':'cr'}" style="font-weight:500">${agg.avgPoP!==null?agg.avgPoP+'%':'—'}</span>`);
+        if(col.key==='_dts'){
+          const d=agg.dts;
+          if(d===null||d===undefined) return TD(s,true,'<span style="color:var(--tx3)">—</span>');
+          const cls = d<0 ? 'cr' : d<3 ? 'cr' : d<10 ? 'ca' : 'cg';
+          const sign = d<0 ? '−' : '';
+          return TD(s,true,`<span class="mono ${cls}" style="font-weight:500">${sign}${Math.abs(d).toFixed(1)}%</span>`);
+        }
         if(col.key==='_pae') return TD(s,true,`<span class="mono ${agg.pae>=0?'cg':'cr'}">${agg.pae!==null?(agg.pae>=0?'+$':'-$')+Math.abs(agg.pae).toFixed(2):'—'}</span>`);
         if(col.key==='_pae_pct') return TD(s,true,`<span class="mono ${paePctCls}" style="font-weight:500">${agg.paePct!==null?agg.paePct.toFixed(1)+'%':'—'}</span>`);
         if(col.key==='P/L Day'){
@@ -2304,7 +2356,7 @@ function renderWFTable(itemsOrLegs, bucketId, currentBucket){
           if(col.key==='Symbol') return TD(s,false,
             `<span style="color:var(--tx3);margin-right:3px;font-size:10px;padding-left:14px">└</span><span style="font-size:11px">${fmtSymbol(leg['Symbol'])}</span>`);
           if(col.key==='_bucket'||col.key==='_type') return TD(s,false,'');
-          const val = col.key==='_pae'?'__pae__':col.key==='_pae_pct'?'__pae_pct__':col.key==='_ann_yield'?'__ann_yield__':col.key==='_capital'?'__capital__':leg[col.key];
+          const val = col.key==='_pae'?'__pae__':col.key==='_pae_pct'?'__pae_pct__':col.key==='_ann_yield'?'__ann_yield__':col.key==='_capital'?'__capital__':col.key==='_dts'?'__dts__':leg[col.key];
           return TD(s,align, fmtWFCell(col,val,derived,leg));
         }).join('');
         return `<tr class="wf-spread-leg" data-wsid="${sid}" style="display:none;background:#FAFDF8" onmouseover="this.style.background='#F3FBF5'" onmouseout="this.style.background='#FAFDF8'">${legCells}</tr>`;
@@ -2322,7 +2374,7 @@ function renderWFTable(itemsOrLegs, bucketId, currentBucket){
         // Bucket column: show currentBucket (where it actually sits), not re-evaluated
         if(col.key==='_bucket') return TD(s,false, currentBucket?bucketTag(currentBucket):'<span style="color:var(--tx3)">—</span>');
         if(col.key==='_type') return TD(s,false, strategyTag(item.type));
-        const val = col.key==='_itmotm'?'__itmotm__':col.key==='_pae'?'__pae__':col.key==='_pae_pct'?'__pae_pct__':col.key==='_ann_yield'?'__ann_yield__':col.key==='_capital'?'__capital__':p[col.key];
+        const val = col.key==='_itmotm'?'__itmotm__':col.key==='_pae'?'__pae__':col.key==='_pae_pct'?'__pae_pct__':col.key==='_ann_yield'?'__ann_yield__':col.key==='_capital'?'__capital__':col.key==='_dts'?'__dts__':p[col.key];
         return TD(s,align, fmtWFCell(col,val,derived,p));
       }).join('');
       return `<tr style="cursor:default" onmouseover="this.style.background='#FAFAF7'" onmouseout="this.style.background=''">${cells}</tr>`;
