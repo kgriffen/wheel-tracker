@@ -594,13 +594,15 @@ function deriveFields(p){
         ? ((strike - last) / last) * 100
         : null;
     if(cp==='Put'){
-      if(strike>last*1.005) itmOtm='ITM';
-      else if(strike<last*0.995) itmOtm='OTM';
-      else itmOtm='ATM';
+      // Put ITM when underlying < strike (any breach). ATM = OTM-side within 0.5% of strike.
+      if(last<strike) itmOtm='ITM';
+      else if(last<=strike*1.005) itmOtm='ATM';
+      else itmOtm='OTM';
     } else {
-      if(strike<last*0.995) itmOtm='ITM';
-      else if(strike>last*1.005) itmOtm='OTM';
-      else itmOtm='ATM';
+      // Call ITM when underlying > strike (any breach). ATM = OTM-side within 0.5% of strike.
+      if(last>strike) itmOtm='ITM';
+      else if(last>=strike*0.995) itmOtm='ATM';
+      else itmOtm='OTM';
     }
   }
 
