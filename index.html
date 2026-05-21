@@ -2011,8 +2011,9 @@ function renderWorkflow(){
     const avgDTE=bktLegs.length?Math.round(bktLegs.reduce((s,p)=>s+(parseDays(p['DTE'])||0),0)/bktLegs.length):0;
     const popsArr=bktLegs.filter(p=>cleanNum(p['PoP'])!=null);
     const pop=popsArr.length?Math.round(popsArr.reduce((s,p)=>s+(cleanNum(p['PoP'])||0),0)/popsArr.length):null;
-    const totalPAE=bktLegs.reduce((s,p)=>{const d=deriveFields(p);return s+(d.pae!==null?d.pae:0);},0);
-    const hasPAE=bktLegs.some(p=>deriveFields(p).pae!==null);
+    const bktItems=bucketItems[b.id]||[];
+    const totalPAE=bktItems.reduce((s,item)=>{const p=item.isSpread?spreadAggregate(item.legs).pae:deriveFields(item.position).pae;return s+(p!==null?p:0);},0);
+    const hasPAE=bktItems.some(item=>item.isSpread?spreadAggregate(item.legs).pae!==null:deriveFields(item.position).pae!==null);
     const condJoiner = (b.operator||'AND') === 'OR' ? ' OR ' : ' AND ';
     const condSummary=b.conditions.map(c=>{const f=COND_FIELDS.find(x=>x.value===c.field);return `${f?f.label:c.field} ${c.op} ${c.value}`;}).join(condJoiner);
     const bIdx=buckets.findIndex(x=>x.id===b.id);
@@ -2063,12 +2064,12 @@ function renderWFStats(list){
   const avgPop=open.filter(p=>cleanNum(p['PoP'])!=null).length
     ?Math.round(open.filter(p=>cleanNum(p['PoP'])!=null).reduce((s,p)=>s+(cleanNum(p['PoP'])||0),0)/open.filter(p=>cleanNum(p['PoP'])!=null).length):null;
   const avgDTE=open.length?Math.round(open.reduce((s,p)=>s+(parseDays(p['DTE'])||0),0)/open.length):null;
-  const totalPAE=open.reduce((s,p)=>{const d=deriveFields(p);return s+(d.pae!==null?d.pae:0);},0);
-  const hasPAE=open.some(p=>deriveFields(p).pae!==null);
-
   // Per-bucket counts — use SAME item-based logic as renderWorkflow
   // buildDisplayItems groups spread legs into single items so counts match
   const statsItems=buildDisplayItems(list);
+  // Use spreadAggregate for PAE so cross-expiry spreads (calendars, PMCC) only count short legs
+  const totalPAE=statsItems.reduce((s,item)=>{const p=item.isSpread?spreadAggregate(item.legs).pae:deriveFields(item.position).pae;return s+(p!==null?p:0);},0);
+  const hasPAE=statsItems.some(item=>item.isSpread?spreadAggregate(item.legs).pae!==null:deriveFields(item.position).pae!==null);
   const statsMatched=new Set();
   const bucketCounts={};
   buckets.forEach(b=>{
