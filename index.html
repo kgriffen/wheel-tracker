@@ -1714,7 +1714,12 @@ function spreadAggregate(legs) {
   const avgPoP = (() => { const ps = legs.filter(l => cleanNum(l['Quantity'])<0 && cleanNum(l['PoP']) != null); return ps.length ? Math.round(ps.reduce((s,l) => s+(cleanNum(l['PoP'])||0),0)/ps.length) : null; })();
   const totalMark = legs.reduce((s, l) => s + (cleanNum(l['Mark'])||0)*(Math.abs(cleanNum(l['Quantity'])||0))*100, 0);
 
-  // PAE for spread: sum of ALL leg PAEs (short AND long + stock)
+  // For cross-expiry spreads (calendars, PMCC) only the short leg expires at near-term DTE.
+  // The long leg retains time value and cannot be estimated without a pricing model, so
+  // including it always collapses PAE% to ±100%. Skip long option legs for these spreads.
+  const _crossExpiry = !legs.filter(l => (l['Type']||'') !== 'EQUITY').every((l, _, arr) => l['Exp Date'] === arr[0]['Exp Date']);
+
+  // PAE for spread: sum of leg PAEs (short AND long + stock); long options skipped for cross-expiry spreads
   let pae = null;
   legs.forEach(l => {
     if((l['Type']||'') === 'EQUITY') {
@@ -1728,6 +1733,7 @@ function spreadAggregate(legs) {
         pae = (pae === null ? 0 : pae) + stockPAE;
       }
     } else {
+      if(_crossExpiry && cleanNum(l['Quantity']) > 0) return; // long leg retains time value — skip
       const d = deriveFields(l);
       if(d.pae !== null) {
         pae = (pae === null ? 0 : pae) + d.pae;
