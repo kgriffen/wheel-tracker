@@ -1740,9 +1740,16 @@ function spreadAggregate(legs) {
       }
     }
   });
-  // PAE% uses net cost (totalCost = net credit for credit spreads, net debit for debit spreads)
-  // Use absolute net cost so the percentage makes sense in both directions
-  const paePct = (pae !== null && totalCost !== 0) ? Math.round((pae / Math.abs(totalCost)) * 1000) / 10 : null;
+  // PAE% denominator: for cross-expiry spreads use the short leg's credit so the metric
+  // behaves identically to a single short put (100% OTM, drops as it goes ITM).
+  // For same-expiry spreads keep the net cost so vertical spread PAE% is unchanged.
+  let paePctBase = Math.abs(totalCost);
+  if(_crossExpiry && pae !== null) {
+    const shortOptLeg = legs.find(l => (l['Type']||'') !== 'EQUITY' && cleanNum(l['Quantity']) < 0);
+    const shortLegCost = shortOptLeg ? cleanNum(shortOptLeg['Cost']) : null;
+    if(shortLegCost !== null && shortLegCost > 0) paePctBase = shortLegCost;
+  }
+  const paePct = (pae !== null && paePctBase !== 0) ? Math.round((pae / paePctBase) * 1000) / 10 : null;
 
   // P/L Day: sum across all legs
   const totalPLDay = legs.reduce((s,l) => s + (cleanNum(l['P/L Day'])||0), 0);
