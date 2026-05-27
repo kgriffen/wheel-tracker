@@ -374,19 +374,30 @@ input[type=checkbox]{width:13px;height:13px;cursor:pointer;accent-color:var(--tx
     <div class="mtitle" id="bucket-mo-title">Create bucket</div>
     <input type="hidden" id="bkt-id">
     <input type="hidden" id="bkt-operator" value="AND">
+    <input type="hidden" id="bkt-spread-eval" value="aggregate">
     <div class="fr"><label>Bucket name</label><input id="bkt-name" placeholder="e.g. Ready to Close"></div>
     <div class="fr">
       <label>Color</label>
       <div class="color-swatches" id="color-swatches"></div>
     </div>
     <div class="fr" style="margin-top:10px">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;gap:12px;flex-wrap:wrap">
         <label style="margin-bottom:0">Conditions</label>
-        <div style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--tx3)">
-          <span>Match</span>
-          <div id="op-toggle" style="display:flex;border:1px solid var(--bdr2);border-radius:var(--r);overflow:hidden;font-size:11px">
-            <button id="op-and-btn" onclick="setBucketOperator('AND')" style="padding:2px 9px;border:none;cursor:pointer;font-family:inherit;font-size:11px;font-weight:600;transition:all .12s">ALL</button>
-            <button id="op-or-btn"  onclick="setBucketOperator('OR')"  style="padding:2px 9px;border:none;cursor:pointer;font-family:inherit;font-size:11px;font-weight:600;transition:all .12s">ANY</button>
+        <div style="display:flex;align-items:center;gap:12px;font-size:11px;color:var(--tx3)">
+          <div style="display:flex;align-items:center;gap:6px">
+            <span>Spread eval</span>
+            <select id="bkt-spread-eval-sel" onchange="setBucketSpreadEval(this.value)" style="font-size:11px;padding:2px 6px;border:1px solid var(--bdr2);border-radius:var(--r);background:var(--surf2);color:var(--tx2);font-family:inherit" title="How multi-leg spreads are tested against this bucket's conditions. Single-leg positions are unaffected.">
+              <option value="aggregate">Aggregate</option>
+              <option value="short">Short leg</option>
+              <option value="any">Any leg</option>
+            </select>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px">
+            <span>Match</span>
+            <div id="op-toggle" style="display:flex;border:1px solid var(--bdr2);border-radius:var(--r);overflow:hidden;font-size:11px">
+              <button id="op-and-btn" onclick="setBucketOperator('AND')" style="padding:2px 9px;border:none;cursor:pointer;font-family:inherit;font-size:11px;font-weight:600;transition:all .12s">ALL</button>
+              <button id="op-or-btn"  onclick="setBucketOperator('OR')"  style="padding:2px 9px;border:none;cursor:pointer;font-family:inherit;font-size:11px;font-weight:600;transition:all .12s">ANY</button>
+            </div>
           </div>
         </div>
       </div>
@@ -1802,6 +1813,27 @@ function spreadAggregate(legs) {
 // For bucket matching on a spread: evaluate bucket against spread aggregate
 function spreadMatchesBucket(legs, bucket, stratType) {
   if(!bucket.conditions || !bucket.conditions.length) return false;
+
+  // Spread eval mode: how multi-leg spreads are tested against bucket conditions.
+  //  'aggregate' (default): test against rolled-up spread values (existing behavior).
+  //  'short':    each short leg (qty<0) tested independently as a single position;
+  //              the spread matches only if EVERY short leg matches the bucket. Spreads
+  //              with zero short legs do not match. The bucket's AND/OR operator still
+  //              applies per-leg across conditions.
+  //  'any':      each leg tested independently; spread matches if ANY leg matches.
+  // In 'short'/'any' modes the entire spread (parent row + all legs) still appears in
+  // the bucket — only the predicate changes, not what's rendered.
+  const mode = bucket.spreadEvalMode || 'aggregate';
+  if(mode === 'short') {
+    const shorts = legs.filter(l => cleanNum(l['Quantity']) < 0);
+    if(!shorts.length) return false;
+    return shorts.every(leg => matchesBucket(leg, bucket));
+  }
+  if(mode === 'any') {
+    return legs.some(leg => matchesBucket(leg, bucket));
+  }
+
+  // mode === 'aggregate' (default) — evaluate against spread-level rolled-up values
   const agg = spreadAggregate(legs);
   const useOR = (bucket.operator||'AND') === 'OR';
   const evalOne = cond => {
@@ -2522,6 +2554,18 @@ function getBucketOperator() {
   return document.getElementById('bkt-operator')?.value || 'AND';
 }
 
+function setBucketSpreadEval(mode){
+  const valid = (mode === 'short' || mode === 'any') ? mode : 'aggregate';
+  const hidden = document.getElementById('bkt-spread-eval');
+  if(hidden) hidden.value = valid;
+  const sel = document.getElementById('bkt-spread-eval-sel');
+  if(sel && sel.value !== valid) sel.value = valid;
+}
+
+function getBucketSpreadEval(){
+  return document.getElementById('bkt-spread-eval')?.value || 'aggregate';
+}
+
 function openBucketBuilder(id){
   editingBucketId=id;
   const isEdit=id!==null;
@@ -2549,6 +2593,7 @@ function openBucketBuilder(id){
   openM('bucket-mo');
   // Set operator toggle after modal is in DOM
   setBucketOperator(existing?.operator || 'AND');
+  setBucketSpreadEval(existing?.spreadEvalMode || 'aggregate');
 }
 
 function selectSwatch(el){
@@ -2625,11 +2670,13 @@ function saveBucket(){
 
   if(!conditions.length){alert('Add at least one condition.');return;}
 
+  const spreadEvalMode=getBucketSpreadEval();
+
   if(editingBucketId){
     const i=buckets.findIndex(b=>b.id===editingBucketId);
-    if(i>=0)buckets[i]={...buckets[i],name,color,conditions,operator};
+    if(i>=0)buckets[i]={...buckets[i],name,color,conditions,operator,spreadEvalMode};
   } else {
-    buckets.push({id:'b-'+Date.now(),name,color,conditions,operator});
+    buckets.push({id:'b-'+Date.now(),name,color,conditions,operator,spreadEvalMode});
   }
 
   saveToLocal();closeM('bucket-mo');renderWorkflow();
