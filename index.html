@@ -2071,6 +2071,7 @@ function renderWorkflow(){
         <div style="font-size:10px;color:var(--tx3);flex:1;margin-left:6px;font-style:italic;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${condSummary}</div>
         <div class="wf-bcnt">${(bucketItems[b.id]||[]).length}</div>
         <div class="wf-bbtns" onclick="event.stopPropagation()">
+          ${(bucketItems[b.id]||[]).some(i=>i.isSpread)?`<button class="btn btn-sm" style="padding:2px 7px;font-size:10px" onclick="toggleAllWFSpreads('${b.id}',this)" title="Expand/collapse all spreads in this bucket">▼▼</button>`:''}
           <button class="btn btn-sm" style="padding:2px 7px;font-size:10px" onclick="openBucketBuilder('${b.id}')">Edit</button>
         </div>
       </div>
@@ -2458,6 +2459,20 @@ function toggleWFSpread(sid){
   const expanded=legs[0]?.style.display!=='none';
   legs.forEach(l=>l.style.display=expanded?'none':'');
   if(toggle) toggle.textContent=expanded?'▶':'▼';
+}
+
+// Bulk expand/collapse all spreads in a bucket. Decides direction from current
+// DOM state so per-row toggles can be mixed in without confusing the button.
+function toggleAllWFSpreads(bucketId,btn){
+  const prefix=`wfs-${bucketId}-`;
+  const legs=document.querySelectorAll(`.wf-spread-leg[data-wsid^="${prefix}"]`);
+  if(!legs.length) return;
+  const anyVisible=Array.from(legs).some(l=>l.style.display!=='none');
+  const willExpand=!anyVisible;
+  legs.forEach(l=>l.style.display=willExpand?'':'none');
+  document.querySelectorAll(`.wf-spread-parent[data-wsid^="${prefix}"] .wf-spread-toggle`)
+    .forEach(t=>t.textContent=willExpand?'▼':'▶');
+  if(btn) btn.textContent=willExpand?'▶▶':'▼▼';
 }
 
 function fmtWFCell(col, val, derived, pos){
