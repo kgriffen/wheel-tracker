@@ -326,7 +326,7 @@ input[type=checkbox]{width:13px;height:13px;cursor:pointer;accent-color:var(--tx
       <div style="font-size:11px;color:var(--tx3);margin-top:3px">tastytrade_positions_*.csv</div>
     </div>
     <div id="import-result" style="margin-top:11px;font-size:12px;display:none"></div>
-    <div class="mf"><button class="btn" onclick="closeM('import-mo')">Close</button></div>
+    <div class="mf"><button class="btn" onclick="closeImportModal()">Close</button></div>
   </div>
 </div>
 
@@ -962,6 +962,7 @@ function posSortValItem(item, colKey) {
     case 'P/L Opn%':   return agg.plPct;
     case 'P/L Day':    return agg.totalPLDay;
     case 'Cost':       return agg.totalCost;
+    case 'Ext':        return agg.totalExt;
     case 'PoP':        return agg.avgPoP;
     case 'DTE':        return agg.minDTE < 999 ? agg.minDTE : null;
     case 'Exp Date':   return agg.sharedExp || null;
@@ -1435,6 +1436,7 @@ const COND_FIELDS=[
   {value:'early_profit',label:'Early Profit Rule',   type:'select', ops:['='], choices:['true']},
   {value:'pae',         label:'PAE $ (Profit at Expiration)', type:'number', ops:['>=','<=','>','<','=']},
   {value:'pae_pct',     label:'PAE % (of premium)',           type:'number', ops:['>=','<=','>','<','=']},
+  {value:'ext_val',     label:'Ext Val $',                     type:'number', ops:['>=','<=','>','<','=']},
 ];
 
 
@@ -1806,8 +1808,14 @@ function spreadAggregate(legs) {
     return nearest;
   })();
 
+  // Ext Val: sum across legs. Null only if NO leg has a value (avoids treating a
+  // partial-data spread as $0). Same-sign convention as the per-leg 'Ext' field.
+  const _extVals = legs.map(l => cleanNum(l['Ext'])).filter(v => v !== null);
+  const totalExt = _extVals.length ? _extVals.reduce((s,v) => s+v, 0) : null;
+
   return { totalCost, totalPLOpen, plPct, minDTE, avgPoP, pae, paePct, totalMark,
-           totalPLDay, totalDelta, totalTheta, lastPrice, sharedExp, sharedDTE, dts };
+           totalPLDay, totalDelta, totalTheta, lastPrice, sharedExp, sharedDTE, dts,
+           totalExt };
 }
 
 // For bucket matching on a spread: evaluate bucket against spread aggregate
@@ -1846,6 +1854,7 @@ function spreadMatchesBucket(legs, bucket, stratType) {
       case 'pop':       actual = agg.avgPoP; break;
       case 'pae':       actual = agg.pae; break;
       case 'pae_pct':   actual = agg.paePct; break;
+      case 'ext_val':   actual = agg.totalExt; break;
       case 'strategy':  actual = stratType || ''; break;
       // For per-leg fields, use first short leg
       default: {
@@ -1952,6 +1961,7 @@ function evalCondition(p,cond,stratType){
     case 'early_profit': actual=derived.earlyProfit?'true':'false'; break;
     case 'pae':     actual=derived.pae; break;
     case 'pae_pct': actual=derived.paePct; break;
+    case 'ext_val': actual=cleanNum(p['Ext']); break;
     case 'itm_otm':{
       const itmOtm=derived.itmOtm;
       if(value==='ATM+ITM') actual=(itmOtm==='ATM'||itmOtm==='ITM')?value:itmOtm;
@@ -2230,6 +2240,7 @@ const WF_COLS = [
   {key:'/ Delta',           label:'Δ',          width:50,  sortable:true,  fmt:'num2'},
   {key:'Theta',             label:'θ',          width:50,  sortable:true,  fmt:'num2'},
   {key:'Cost',              label:'Cost',       width:72,  sortable:true,  fmt:'money'},
+  {key:'Ext',               label:'Ext Val',    width:75,  sortable:true,  fmt:'money'},
   {key:'Sector',            label:'Sector',     width:100, sortable:true,  fmt:'text'},
 ];
 
@@ -2244,6 +2255,7 @@ function wfSortValItem(item, colKey) {
     case 'P/L Opn%':   return agg.plPct;
     case 'P/L Day':    return agg.totalPLDay;
     case 'Cost':       return agg.totalCost;
+    case 'Ext':        return agg.totalExt;
     case 'PoP':        return agg.avgPoP;
     case '_dts':       return agg.dts;
     case 'DTE':        return agg.minDTE < 999 ? agg.minDTE : null;
@@ -2357,6 +2369,7 @@ function renderWFTable(itemsOrLegs, bucketId, currentBucket){
         if(col.key==='Exp Date') return TD(s,false, agg.sharedExp||'—');
         if(col.key==='DTE') return TD(s,true,`<span class="mono${(agg.sharedDTE?parseDays(agg.sharedDTE):agg.minDTE)<=7?' cr':(agg.sharedDTE?parseDays(agg.sharedDTE):agg.minDTE)<=14?' ca':''}">${agg.sharedDTE||(agg.minDTE<999?agg.minDTE+'d':'—')}</span>`);
         if(col.key==='Cost') return TD(s,true,`<span class="mono ${agg.totalCost>=0?'cg':'cr'}">${agg.totalCost>=0?'$':'-$'}${Math.abs(agg.totalCost).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}</span>`);
+        if(col.key==='Ext') return TD(s,true, fmtCell(col, agg.totalExt, null, null));
         if(col.key==='P/L Open') return TD(s,true,`<span class="mono ${plCls}">${agg.totalPLOpen>=0?'+$':'-$'}${Math.abs(agg.totalPLOpen).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}</span>`);
         if(col.key==='P/L Opn%') return TD(s,true,`<span class="mono ${plCls}">${agg.plPct!==null?agg.plPct.toFixed(1)+'%':'—'}</span>`);
         if(col.key==='PoP') return TD(s,true,`<span class="mono ${agg.avgPoP>=65?'cg':agg.avgPoP>=50?'ca':'cr'}" style="font-weight:500">${agg.avgPoP!==null?agg.avgPoP+'%':'—'}</span>`);
@@ -2710,7 +2723,13 @@ function showPage(id,btn){
 
 function openM(id){document.getElementById(id).classList.add('open');}
 function closeM(id){document.getElementById(id).classList.remove('open');}
-document.querySelectorAll('.mo').forEach(m=>m.addEventListener('click',e=>{if(e.target===m)m.classList.remove('open');}));
+// Closing the import modal forces a fresh render so any newly imported data
+// shows up immediately on whichever page the user lands on.
+function closeImportModal(){ closeM('import-mo'); renderAll(); }
+document.querySelectorAll('.mo').forEach(m=>m.addEventListener('click',e=>{
+  if(e.target!==m) return;
+  if(m.id==='import-mo') closeImportModal(); else closeM(m.id);
+}));
 
 
 // Migrate existing saved buckets to new default order if they're the default set
