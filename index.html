@@ -2069,9 +2069,9 @@ function renderWorkflow(){
         <div class="wf-bdot" style="background:${b.color}"></div>
         <div class="wf-bname">${b.name}</div>
         <div style="font-size:10px;color:var(--tx3);flex:1;margin-left:6px;font-style:italic;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${condSummary}</div>
+        ${(bucketItems[b.id]||[]).some(i=>i.isSpread)?`<span onclick="event.stopPropagation()" style="margin-right:6px"><button class="btn btn-sm" style="padding:2px 7px;font-size:10px" onclick="toggleAllWFSpreads('${b.id}',this)" title="Expand/collapse all spreads in this bucket">▼▼</button></span>`:''}
         <div class="wf-bcnt">${(bucketItems[b.id]||[]).length}</div>
         <div class="wf-bbtns" onclick="event.stopPropagation()">
-          ${(bucketItems[b.id]||[]).some(i=>i.isSpread)?`<button class="btn btn-sm" style="padding:2px 7px;font-size:10px" onclick="toggleAllWFSpreads('${b.id}',this)" title="Expand/collapse all spreads in this bucket">▼▼</button>`:''}
           <button class="btn btn-sm" style="padding:2px 7px;font-size:10px" onclick="openBucketBuilder('${b.id}')">Edit</button>
         </div>
       </div>
