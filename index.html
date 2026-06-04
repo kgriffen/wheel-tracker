@@ -2069,7 +2069,7 @@ function renderWorkflow(){
         <div class="wf-bdot" style="background:${b.color}"></div>
         <div class="wf-bname">${b.name}</div>
         <div style="font-size:10px;color:var(--tx3);flex:1;margin-left:6px;font-style:italic;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${condSummary}</div>
-        ${(bucketItems[b.id]||[]).some(i=>i.isSpread)?`<span onclick="event.stopPropagation()" style="margin-right:6px"><button class="btn btn-sm" style="padding:2px 7px;font-size:10px" onclick="toggleAllWFSpreads('${b.id}',this)" title="Expand/collapse all spreads in this bucket">▼▼</button></span>`:''}
+        ${(bucketItems[b.id]||[]).some(i=>i.isSpread)?`<span onclick="event.stopPropagation()" style="margin-right:6px"><button class="btn btn-sm" style="padding:2px 7px;font-size:10px" onclick="toggleAllWFSpreads('${b.id}',this)" title="Expand/collapse all spreads in this bucket">▶▶</button></span>`:''}
         <div class="wf-bcnt">${(bucketItems[b.id]||[]).length}</div>
         <div class="wf-bbtns" onclick="event.stopPropagation()">
           <button class="btn btn-sm" style="padding:2px 7px;font-size:10px" onclick="openBucketBuilder('${b.id}')">Edit</button>
@@ -2472,7 +2472,7 @@ function toggleAllWFSpreads(bucketId,btn){
   legs.forEach(l=>l.style.display=willExpand?'':'none');
   document.querySelectorAll(`.wf-spread-parent[data-wsid^="${prefix}"] .wf-spread-toggle`)
     .forEach(t=>t.textContent=willExpand?'▼':'▶');
-  if(btn) btn.textContent=willExpand?'▶▶':'▼▼';
+  if(btn) btn.textContent=willExpand?'▼▼':'▶▶';
 }
 
 function fmtWFCell(col, val, derived, pos){
