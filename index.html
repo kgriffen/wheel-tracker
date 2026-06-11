@@ -2173,8 +2173,6 @@ function renderWFStats(list){
       return s + (cleanNum(p['Quantity']) < 0 ? (d._capital || 0) : 0);
     }
   }, 0);
-  // Theta % of notional (daily theta / notional, expressed as %) — used as subtitle
-  const thetaPct = wfNotional > 0 ? Math.abs(totalTheta) / wfNotional * 100 : null;
   // Theta Ratio = totalTheta / totalBwDelta. Color thresholds on |ratio|:
   // <1 red, <2 amber, >=2 green. Null/divide-by-zero → neutral.
   const thetaRatio = totalBwDelta !== 0 && totalBwDelta !== null ? totalTheta / totalBwDelta : null;
@@ -2208,7 +2206,7 @@ function renderWFStats(list){
     <div class="stat">
       <div class="sl">θ Ratio</div>
       <div class="sv ${thetaCls}" style="font-size:16px">${thetaRatio!==null?(thetaRatio>=0?'+':'')+thetaRatio.toFixed(2):'—'}</div>
-      <div class="ss">${thetaPct!==null?thetaPct.toFixed(3)+'% of notional':'no notional data'}</div>
+      <div class="ss">${(totalTheta>=0?'+':'')+Math.round(totalTheta)} θ / ${(totalBwDelta>=0?'+':'')+Math.round(totalBwDelta)} βΔ</div>
     </div>
     ${bucketWidgets}
     ${uncatCount>0?`<div class="stat"><div class="sl" style="display:flex;align-items:center;gap:4px"><span style="width:7px;height:7px;border-radius:50%;background:#888780;display:inline-block"></span>Uncategorized</div><div class="sv" style="font-size:18px">${uncatCount}</div></div>`:''}
