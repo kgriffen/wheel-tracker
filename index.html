@@ -1464,11 +1464,16 @@ const STRATEGY_STYLES = {
   'Unknown':             {color:'#888780', bg:'#F0EFE9'},
 };
 
+// Weekly/PM-settled index option classes that share an underlying index.
+// Normalizing them lets buildDisplayItems group SPX + SPXW (etc.) as spread legs.
+const INDEX_WEEKLY_ALIASES = { SPXW: 'SPX', RUTW: 'RUT', NDXP: 'NDX' };
+
 function getUnderlying(sym) {
   if(!sym) return '';
   if(sym.startsWith('./')) return sym.split(' ')[0]; // futures: ./ESH6
   const m = sym.match(/^([A-Z]+)\s/);
-  return m ? m[1] : sym.trim();
+  const raw = m ? m[1] : sym.trim();
+  return INDEX_WEEKLY_ALIASES[raw] || raw;
 }
 
 function getFuturesMultiplier(sym) {
